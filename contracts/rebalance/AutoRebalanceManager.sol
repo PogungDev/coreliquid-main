@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -331,30 +331,30 @@ contract AutoRebalanceManager is AccessControl, ReentrancyGuard, Pausable {
         return deviation > maxDeviation;
     }
     
-    function _collectFees(uint256 tokenId) internal returns (uint256 amount0, uint256 amount1) {
+    function _collectFees(uint256 /* _tokenId */) internal pure returns (uint256 amount0, uint256 amount1) {
         // Implementation would call Uniswap's collect function
         // This is a placeholder for the actual implementation
         return (0, 0);
     }
     
-    function _closePosition(uint256 tokenId) internal returns (uint256 amount0, uint256 amount1) {
+    function _closePosition(uint256 /* _tokenId */) internal pure returns (uint256 amount0, uint256 amount1) {
         // Implementation would call Uniswap's decreaseLiquidity and collect
         // This is a placeholder for the actual implementation
         return (0, 0);
     }
     
     function _openNewPosition(
-        address token0,
-        address token1,
-        uint24 fee,
-        int24 tickLower,
-        int24 tickUpper,
-        uint256 amount0,
-        uint256 amount1,
-        uint256 amount0Min,
-        uint256 amount1Min,
-        uint256 deadline
-    ) internal returns (uint256 tokenId, uint128 liquidity, uint256 actualAmount0, uint256 actualAmount1) {
+        address /* _token0 */,
+        address /* _token1 */,
+        uint24 /* _fee */,
+        int24 /* _tickLower */,
+        int24 /* _tickUpper */,
+        uint256 /* _amount0 */,
+        uint256 /* _amount1 */,
+        uint256 /* _amount0Min */,
+        uint256 /* _amount1Min */,
+        uint256 /* _deadline */
+    ) internal pure returns (uint256 tokenId, uint128 liquidity, uint256 actualAmount0, uint256 actualAmount1) {
         // Implementation would call Uniswap's mint function
         // This is a placeholder for the actual implementation
         return (0, 0, 0, 0);
@@ -418,15 +418,15 @@ contract AutoRebalanceManager is AccessControl, ReentrancyGuard, Pausable {
         rebalanceHistory[oldTokenId] = block.timestamp;
     }
     
-    function _getCurrentTick(address token0, address token1, uint24 fee) internal view returns (int24) {
+    function _getCurrentTick(address /* _token0 */, address /* _token1 */, uint24 /* _fee */) internal pure returns (int24) {
         // Implementation would get current tick from Uniswap pool
         // This is a placeholder
         return 0;
     }
     
-    function _calculateOptimalRange(address token0, address token1, uint24 fee)
+    function _calculateOptimalRange(address /* _token0 */, address /* _token1 */, uint24 /* _fee */)
         internal
-        view
+        pure
         returns (int24 tickLower, int24 tickUpper, uint256 confidence)
     {
         // Implementation would calculate optimal range based on volatility and other factors

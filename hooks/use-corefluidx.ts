@@ -256,16 +256,18 @@ export const useCoreFluidX = (options: UseCoreFluidXOptions = {}): UseCoreFluidX
       dispatch({ type: 'SET_LOADING', payload: { key: 'ulp', loading: true } })
       
       const tx = await contracts.depositToULP(token, amount)
-      toast.info('Transaction submitted, waiting for confirmation...')
+      console.log(`🔄 Deposit Transaction Hash: ${tx.hash}`)
+      toast.info(`Transaction submitted: ${tx.hash.slice(0, 10)}...`)
       
-      await tx.wait()
-      toast.success('Deposit successful!')
+      const receipt = await tx.wait()
+      console.log(`✅ Deposit Confirmed - Block: ${receipt?.blockNumber || 'unknown'}, Gas Used: ${receipt?.gasUsed?.toString() || 'unknown'}`)
+      toast.success(`Deposit successful! Tx: ${tx.hash.slice(0, 10)}...`)
       
       // Refresh data after successful transaction
       await refreshULPData()
       
     } catch (err: any) {
-      console.error('Deposit failed:', err)
+      console.error('❌ Deposit failed:', err)
       toast.error(`Deposit failed: ${err.message || 'Unknown error'}`)
       dispatch({ type: 'SET_ERROR', payload: { key: 'ulp', error: err.message } })
     } finally {
@@ -285,15 +287,17 @@ export const useCoreFluidX = (options: UseCoreFluidXOptions = {}): UseCoreFluidX
       dispatch({ type: 'SET_LOADING', payload: { key: 'ulp', loading: true } })
       
       const tx = await contracts.withdrawFromULP(shares)
-      toast.info('Transaction submitted, waiting for confirmation...')
+      console.log(`🔄 Withdraw Transaction Hash: ${tx.hash}`)
+      toast.info(`Transaction submitted: ${tx.hash.slice(0, 10)}...`)
       
-      await tx.wait()
-      toast.success('Withdrawal successful!')
+      const receipt = await tx.wait()
+      console.log(`✅ Withdraw Confirmed - Block: ${receipt?.blockNumber || 'unknown'}, Gas Used: ${receipt?.gasUsed?.toString() || 'unknown'}`)
+      toast.success(`Withdrawal successful! Tx: ${tx.hash.slice(0, 10)}...`)
       
       await refreshULPData()
       
     } catch (err: any) {
-      console.error('Withdrawal failed:', err)
+      console.error('❌ Withdrawal failed:', err)
       toast.error(`Withdrawal failed: ${err.message || 'Unknown error'}`)
       dispatch({ type: 'SET_ERROR', payload: { key: 'ulp', error: err.message } })
     } finally {
@@ -330,15 +334,17 @@ export const useCoreFluidX = (options: UseCoreFluidXOptions = {}): UseCoreFluidX
       dispatch({ type: 'SET_LOADING', payload: { key: 'revenue', loading: true } })
       
       const tx = await contracts.claimRevenue(state.accountAddress)
-      toast.info('Transaction submitted, waiting for confirmation...')
+      console.log(`🔄 Claim Revenue Transaction Hash: ${tx.hash}`)
+      toast.info(`Transaction submitted: ${tx.hash.slice(0, 10)}...`)
       
-      await tx.wait()
-      toast.success('Revenue claimed successfully!')
+      const receipt = await tx.wait()
+      console.log(`✅ Revenue Claim Confirmed - Block: ${receipt?.blockNumber || 'unknown'}, Gas Used: ${receipt?.gasUsed?.toString() || 'unknown'}`)
+      toast.success(`Revenue claimed successfully! Tx: ${tx.hash.slice(0, 10)}...`)
       
       await refreshRevenueData()
       
     } catch (err: any) {
-      console.error('Revenue claim failed:', err)
+      console.error('❌ Revenue claim failed:', err)
       toast.error(`Revenue claim failed: ${err.message || 'Unknown error'}`)
       dispatch({ type: 'SET_ERROR', payload: { key: 'revenue', error: err.message } })
     } finally {

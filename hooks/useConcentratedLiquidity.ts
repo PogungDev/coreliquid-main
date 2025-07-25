@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useAccount, useContractRead, useContractWrite, usePrepareContractWrite } from 'wagmi';
+import { useAccount, useContractRead, useWriteContract } from 'wagmi';
 import { parseEther, formatEther } from 'viem';
 import { toast } from 'sonner';
 
@@ -100,6 +100,8 @@ export function useConcentratedLiquidity() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { writeContract } = useWriteContract();
+
   const unifiedLiquidityPoolAddress = process.env.NEXT_PUBLIC_UNIFIED_LIQUIDITY_POOL_ADDRESS as `0x${string}`;
   const rangeCalculatorAddress = process.env.NEXT_PUBLIC_RANGE_CALCULATOR_ADDRESS as `0x${string}`;
 
@@ -124,47 +126,6 @@ export function useConcentratedLiquidity() {
       3000 // 0.3% fee tier
     ],
     enabled: isConnected
-  });
-
-  // Prepare rebalance transaction
-  const { config: rebalanceConfig } = usePrepareContractWrite({
-    address: unifiedLiquidityPoolAddress,
-    abi: UNIFIED_LIQUIDITY_POOL_ABI,
-    functionName: 'rebalance',
-    args: ['0x0000000000000000000000000000000000000000000000000000000000000001'], // Default pool ID
-    enabled: !!address && isConnected
-  });
-
-  const { write: executeRebalance, isLoading: isRebalancing } = useContractWrite({
-    ...rebalanceConfig,
-    onSuccess: () => {
-      toast.success('Position rebalanced successfully!');
-      refetchPositions();
-      fetchMetrics();
-    },
-    onError: (error) => {
-      toast.error(`Rebalance failed: ${error.message}`);
-    }
-  });
-
-  // Prepare auto-rebalance transaction
-  const { config: autoRebalanceConfig } = usePrepareContractWrite({
-    address: unifiedLiquidityPoolAddress,
-    abi: UNIFIED_LIQUIDITY_POOL_ABI,
-    functionName: 'autoRebalanceAll',
-    enabled: !!address && isConnected
-  });
-
-  const { write: executeAutoRebalance, isLoading: isAutoRebalancing } = useContractWrite({
-    ...autoRebalanceConfig,
-    onSuccess: () => {
-      toast.success('Auto-rebalance executed successfully!');
-      refetchPositions();
-      fetchMetrics();
-    },
-    onError: (error) => {
-      toast.error(`Auto-rebalance failed: ${error.message}`);
-    }
   });
 
   const fetchMetrics = useCallback(async () => {
@@ -258,30 +219,47 @@ export function useConcentratedLiquidity() {
   }, [optimalTicks]);
 
   const updatePosition = useCallback(async () => {
-    if (!executeRebalance) {
+    if (!writeContract) {
       toast.error('Rebalance function not available');
       return;
     }
     
     try {
-      await executeRebalance();
+      await writeContract({
+        address: unifiedLiquidityPoolAddress,
+        abi: UNIFIED_LIQUIDITY_POOL_ABI,
+        functionName: 'rebalance',
+        args: ['0x0000000000000000000000000000000000000000000000000000000000000001'], // Default pool ID
+      });
+      toast.success('Position rebalanced successfully!');
+      refetchPositions();
+      fetchMetrics();
     } catch (err) {
       console.error('Error updating position:', err);
+      toast.error(`Rebalance failed: ${err.message}`);
     }
-  }, [executeRebalance]);
+  }, [writeContract, refetchPositions, fetchMetrics]);
 
   const optimizeRange = useCallback(async () => {
-    if (!executeAutoRebalance) {
+    if (!writeContract) {
       toast.error('Auto-rebalance function not available');
       return;
     }
     
     try {
-      await executeAutoRebalance();
+      await writeContract({
+        address: unifiedLiquidityPoolAddress,
+        abi: UNIFIED_LIQUIDITY_POOL_ABI,
+        functionName: 'autoRebalanceAll',
+      });
+      toast.success('Auto-rebalance executed successfully!');
+      refetchPositions();
+      fetchMetrics();
     } catch (err) {
       console.error('Error optimizing range:', err);
+      toast.error(`Auto-rebalance failed: ${err.message}`);
     }
-  }, [executeAutoRebalance]);
+  }, [writeContract, refetchPositions, fetchMetrics]);
 
   const collectFees = useCallback(async () => {
     // Implementation for collecting fees
@@ -323,7 +301,7 @@ export function useConcentratedLiquidity() {
     positionData,
     concentratedLiquidityMetrics,
     optimalRange,
-    loading: loading || isRebalancing || isAutoRebalancing,
+    loading,
     error,
     updatePosition,
     optimizeRange,

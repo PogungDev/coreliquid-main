@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -524,7 +524,7 @@ contract YieldAggregator is AccessControl, ReentrancyGuard, Pausable {
         }
     }
     
-    function _harvestUserYield(address user, uint256 shares) internal returns (uint256) {
+    function _harvestUserYield(address user, uint256 shares) internal view returns (uint256) {
         // Calculate user's share of total yield
         uint256 userShare = (shares * BASIS_POINTS) / totalShares;
         uint256 yieldEarned = (totalYieldGenerated * userShare) / BASIS_POINTS;
@@ -673,7 +673,7 @@ contract YieldAggregator is AccessControl, ReentrancyGuard, Pausable {
         return yieldSources[source].totalDeposited;
     }
     
-    function _getAvailableBalance() internal view returns (uint256) {
+    function _getAvailableBalance() internal pure returns (uint256) {
         // Return balance of base tokens held by this contract
         // Implementation depends on token handling strategy
         return 0;

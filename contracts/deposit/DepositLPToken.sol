@@ -4,13 +4,13 @@ pragma solidity ^0.8.19;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
- * @title UnifiedLPToken
+ * @title DepositLPToken
  * @dev ERC-20 token representing protocol liquidity shares
  */
-contract UnifiedLPToken is ERC20, ERC20Burnable, AccessControl, Pausable {
+contract DepositLPToken is ERC20, ERC20Burnable, AccessControl, Pausable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
@@ -149,12 +149,12 @@ contract UnifiedLPToken is ERC20, ERC20Burnable, AccessControl, Pausable {
         _unpause();
     }
     
-    function _beforeTokenTransfer(
+    function _update(
         address from,
         address to,
         uint256 amount
     ) internal override whenNotPaused {
-        super._beforeTokenTransfer(from, to, amount);
+        super._update(from, to, amount);
         
         // Update shares tracking on transfer
         if (from != address(0) && to != address(0)) {

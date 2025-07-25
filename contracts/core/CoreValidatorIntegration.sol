@@ -1,12 +1,36 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+
+// Interfaces for Core Chain system contracts
+interface ICoreValidatorSet {
+    function getValidators() external view returns (address[] memory);
+    function isCurrentValidator(address validator) external view returns (bool);
+    function getValidatorInfo(address validator) external view returns (
+        uint256 votingPower,
+        uint256 jailed,
+        uint256 incoming
+    );
+    function delegate(address validator) external payable;
+    function undelegate(address validator, uint256 amount) external;
+    function redelegate(address srcValidator, address dstValidator, uint256 amount) external;
+}
+
+interface ICoreSlashIndicator {
+    function getSlashRecord(address validator) external view returns (uint256, uint256);
+    function isSlashed(address validator) external view returns (bool);
+}
+
+interface ICoreSystemReward {
+    function claimRewards() external;
+    function getRewardInfo(address delegator) external view returns (uint256, uint256);
+}
 
 /**
  * @title CoreValidatorIntegration
@@ -28,30 +52,6 @@ contract CoreValidatorIntegration is AccessControl, ReentrancyGuard, Pausable {
     address public constant CORE_SYSTEM_REWARD = 0x0000000000000000000000000000000000001002;
     address public constant CORE_LIGHT_CLIENT = 0x0000000000000000000000000000000000001003;
     address public constant CORE_RELAY_HUB = 0x0000000000000000000000000000000000001004;
-    
-    // Interfaces for Core Chain system contracts
-    interface ICoreValidatorSet {
-        function getValidators() external view returns (address[] memory);
-        function isCurrentValidator(address validator) external view returns (bool);
-        function getValidatorInfo(address validator) external view returns (
-            uint256 votingPower,
-            uint256 jailed,
-            uint256 incoming
-        );
-        function delegate(address validator) external payable;
-        function undelegate(address validator, uint256 amount) external;
-        function redelegate(address srcValidator, address dstValidator, uint256 amount) external;
-    }
-    
-    interface ICoreSlashIndicator {
-        function getSlashRecord(address validator) external view returns (uint256, uint256);
-        function isSlashed(address validator) external view returns (bool);
-    }
-    
-    interface ICoreSystemReward {
-        function claimRewards() external;
-        function getRewardInfo(address delegator) external view returns (uint256, uint256);
-    }
     
     // Validator information structure
     struct ValidatorInfo {
@@ -185,8 +185,7 @@ contract CoreValidatorIntegration is AccessControl, ReentrancyGuard, Pausable {
         require(!validators[validator].isJailed, "Validator is jailed");
         require(userDelegations[msg.sender].length < maxValidatorsPerUser, "Too many delegations");
         
-        // Transfer CORE tokens
-        coreToken.safeTransferFrom(msg.sender, address(this), amount);
+        // CORE tokens delegated without transfer
         
         // Delegate through Core Chain's native mechanism
         ICoreValidatorSet(CORE_VALIDATOR_SET).delegate{value: amount}(validator);

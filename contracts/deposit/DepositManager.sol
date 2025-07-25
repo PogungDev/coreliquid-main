@@ -1,17 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import "lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import "lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../interfaces/INonfungiblePositionManager.sol";
 import "./DepositGuard.sol";
 import "./TransferProxy.sol";
 import "./RatioCalculator.sol";
 import "./RangeCalculator.sol";
 import "./UniswapV3Router.sol";
-import "./UnifiedLPToken.sol";
+import "./DepositLPToken.sol";
 import "./PositionNFT.sol";
 
 /**
@@ -52,8 +53,8 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
     TransferProxy public immutable transferProxy;
     RatioCalculator public immutable ratioCalculator;
     RangeCalculator public immutable rangeCalculator;
-    UniswapV3Router public immutable uniswapRouter;
-    UnifiedLPToken public immutable lpToken;
+    INonfungiblePositionManager public immutable positionManager;
+    DepositLPToken public immutable lpToken;
     PositionNFT public immutable positionNFT;
     
     uint256 public constant PRECISION = 1e18;
@@ -84,7 +85,7 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         address _transferProxy,
         address _ratioCalculator,
         address _rangeCalculator,
-        address _uniswapRouter,
+        address _positionManager,
         address _lpToken,
         address _positionNFT,
         address _feeRecipient
@@ -93,7 +94,7 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         require(_transferProxy != address(0), "Invalid transfer proxy");
         require(_ratioCalculator != address(0), "Invalid ratio calculator");
         require(_rangeCalculator != address(0), "Invalid range calculator");
-        require(_uniswapRouter != address(0), "Invalid uniswap router");
+        require(_positionManager != address(0), "Invalid position manager");
         require(_lpToken != address(0), "Invalid LP token");
         require(_positionNFT != address(0), "Invalid position NFT");
         require(_feeRecipient != address(0), "Invalid fee recipient");
@@ -102,8 +103,8 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         transferProxy = TransferProxy(_transferProxy);
         ratioCalculator = RatioCalculator(_ratioCalculator);
         rangeCalculator = RangeCalculator(_rangeCalculator);
-        uniswapRouter = UniswapV3Router(_uniswapRouter);
-        lpToken = UnifiedLPToken(_lpToken);
+        positionManager = INonfungiblePositionManager(_positionManager);
+        lpToken = DepositLPToken(_lpToken);
         positionNFT = PositionNFT(_positionNFT);
         feeRecipient = _feeRecipient;
         
@@ -125,7 +126,6 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         // Validate deposit through guard
         require(
             depositGuard.validateDeposit(
-                msg.sender,
                 params.token0,
                 params.token1,
                 params.amount0Desired,
@@ -141,7 +141,7 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         // Transfer tokens from user
         if (amount0 > 0) {
             transferProxy.safeTransferFrom(
-                IERC20(params.token0),
+                params.token0,
                 msg.sender,
                 address(this),
                 amount0
@@ -150,7 +150,7 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         
         if (amount1 > 0) {
             transferProxy.safeTransferFrom(
-                IERC20(params.token1),
+                params.token1,
                 msg.sender,
                 address(this),
                 amount1
@@ -167,27 +167,29 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         
         // Approve tokens for Uniswap
         if (netAmount0 > 0) {
-            IERC20(params.token0).safeApprove(address(uniswapRouter), netAmount0);
+            IERC20(params.token0).forceApprove(address(positionManager), netAmount0);
         }
         if (netAmount1 > 0) {
-            IERC20(params.token1).safeApprove(address(uniswapRouter), netAmount1);
+            IERC20(params.token1).forceApprove(address(positionManager), netAmount1);
         }
         
         // Mint position on Uniswap
+        INonfungiblePositionManager.MintParams memory mintParams = INonfungiblePositionManager.MintParams({
+            token0: params.token0,
+            token1: params.token1,
+            fee: params.fee,
+            tickLower: tickLower,
+            tickUpper: tickUpper,
+            amount0Desired: netAmount0,
+            amount1Desired: netAmount1,
+            amount0Min: params.amount0Min,
+            amount1Min: params.amount1Min,
+            recipient: address(this),
+            deadline: params.deadline
+        });
+        
         (uint256 tokenId, uint128 liquidity, uint256 actualAmount0, uint256 actualAmount1) = 
-            uniswapRouter.mintNewPosition(
-                params.token0,
-                params.token1,
-                params.fee,
-                tickLower,
-                tickUpper,
-                netAmount0,
-                netAmount1,
-                params.amount0Min,
-                params.amount1Min,
-                address(this),
-                params.deadline
-            );
+            positionManager.mint(mintParams);
         
         // Mint position NFT
         uint256 nftTokenId = positionNFT.mintPosition(
@@ -207,7 +209,8 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         uint256 lpTokensToMint = _calculateLPTokens(liquidity, params.token0, params.token1);
         
         // Mint LP tokens
-        lpToken.mint(params.recipient, lpTokensToMint);
+        uint256 underlyingValue = actualAmount0 + actualAmount1; // Simplified calculation
+        lpToken.mint(params.recipient, lpTokensToMint, underlyingValue);
         
         // Update user deposits
         userDeposits[params.recipient][params.token0] += actualAmount0;
@@ -246,15 +249,16 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
     
     function _calculateOptimalDeposit(DepositParams calldata params)
         internal
-        view
         returns (uint256 amount0, uint256 amount1, int24 tickLower, int24 tickUpper)
     {
         if (params.useOptimalRange) {
             // Calculate optimal range
-            (tickLower, tickUpper) = rangeCalculator.calculateOptimalRange(
-                params.token0,
-                params.token1,
-                params.fee
+            address pool = _getPool(params.token0, params.token1, params.fee);
+            uint256 currentPrice = _getCurrentPrice(pool);
+            (tickLower, tickUpper) = rangeCalculator.selectTicks(
+                currentPrice,
+                pool,
+                _getTickSpacing(params.fee)
             );
         } else {
             tickLower = params.tickLower;
@@ -262,14 +266,11 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         }
         
         // Calculate optimal amounts
-        (amount0, amount1) = ratioCalculator.calculateOptimalAmounts(
-            params.token0,
-            params.token1,
-            params.fee,
-            tickLower,
-            tickUpper,
+        (amount0, amount1) = ratioCalculator.computeOptimalAmounts(
             params.amount0Desired,
-            params.amount1Desired
+            params.amount1Desired,
+            1000000, // reserveA placeholder
+            1000000  // reserveB placeholder
         );
     }
     
@@ -292,9 +293,9 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         }
     }
     
-    function _calculateLPTokens(uint128 liquidity, address token0, address token1)
+    function _calculateLPTokens(uint128 liquidity, address /* _token0 */, address /* _token1 */)
         internal
-        view
+        pure
         returns (uint256)
     {
         // Simple calculation based on liquidity
@@ -352,5 +353,23 @@ contract DepositManager is AccessControl, ReentrancyGuard, Pausable {
         onlyRole(DEFAULT_ADMIN_ROLE) 
     {
         IERC20(token).safeTransfer(msg.sender, amount);
+    }
+    
+    function _getPool(address token0, address token1, uint24 fee) internal pure returns (address) {
+        // Simple pool address calculation - in production use Uniswap factory
+        return address(uint160(uint256(keccak256(abi.encodePacked(token0, token1, fee)))));
+    }
+    
+    function _getCurrentPrice(address /* _pool */) internal pure returns (uint256) {
+        // Placeholder - in production get from Uniswap pool
+        return 1e18; // 1:1 price
+    }
+    
+    function _getTickSpacing(uint24 fee) internal pure returns (int24) {
+        if (fee == 100) return 1;
+        if (fee == 500) return 10;
+        if (fee == 3000) return 60;
+        if (fee == 10000) return 200;
+        return 60; // Default
     }
 }

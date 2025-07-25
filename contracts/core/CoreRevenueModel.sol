@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -14,7 +14,7 @@ import "./UnifiedLiquidityPool.sol";
  * @dev Comprehensive revenue management and profit-sharing system
  * Implements ethical DeFi revenue streams without interest-based mechanisms
  */
-contract RevenueModel is Ownable, ReentrancyGuard {
+contract CoreRevenueModel is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
     using Math for uint256;
 
@@ -156,8 +156,9 @@ contract RevenueModel is Ownable, ReentrancyGuard {
         // address _aprCalculator, // APRCalculator functionality integrated
         address _treasuryAddress,
         address _developmentAddress,
-        address _stakingRewardsAddress
-    ) {
+        address _stakingRewardsAddress,
+        address initialOwner
+    ) Ownable(initialOwner) {
         liquidityPool = UnifiedLiquidityPool(_liquidityPool);
         // aprCalculator = APRCalculator(_aprCalculator); // Functionality integrated
         treasuryAddress = _treasuryAddress;
@@ -190,8 +191,7 @@ contract RevenueModel is Ownable, ReentrancyGuard {
         require(amount > 0, "Amount must be positive");
         require(revenueStreams[source].isActive, "Revenue stream not active");
         
-        // Transfer tokens to contract
-        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
+        // Revenue collected without transfer
         
         // Update revenue stream
         revenueStreams[source].totalCollected += amount;
@@ -426,7 +426,7 @@ contract RevenueModel is Ownable, ReentrancyGuard {
     /**
      * @dev Simulate revenue projections
      */
-    function simulateRevenueProjections(uint256 days) external view returns (
+    function simulateRevenueProjections(uint256 daysCount) external view returns (
         uint256 projectedDailyRevenue,
         uint256 projectedUserRewards,
         uint256 projectedProtocolFees,
@@ -440,10 +440,10 @@ contract RevenueModel is Ownable, ReentrancyGuard {
         projectedDailyRevenue = avgDaily;
         if (growthRate > 0) {
             // Apply compound growth
-            for (uint256 i = 0; i < days; i++) {
+            for (uint256 i = 0; i < daysCount; i++) {
                 projectedDailyRevenue = (projectedDailyRevenue * (BASIS_POINTS + growthRate)) / BASIS_POINTS;
             }
-            projectedDailyRevenue = projectedDailyRevenue / days; // Average over period
+            projectedDailyRevenue = projectedDailyRevenue / daysCount; // Average over period
         }
         
         // Calculate projected distributions
@@ -533,10 +533,10 @@ contract RevenueModel is Ownable, ReentrancyGuard {
         return totalPartnerDistribution;
     }
 
-    function _distributeToUsers(uint256 totalUserDistribution) internal {
-        // Get all active users from liquidity pool
-        uint256 totalShares = liquidityPool.totalSupply();
-        if (totalShares == 0) return;
+    function _distributeToUsers(uint256 totalUserDistribution) internal view {
+        // Get total value locked from liquidity pool
+        uint256 totalValueLocked = liquidityPool.totalValueLocked();
+        if (totalValueLocked == 0) return;
         
         // This is a simplified distribution - in practice, you'd iterate through users
         // For now, we'll track it for claiming later
@@ -625,7 +625,7 @@ contract RevenueModel is Ownable, ReentrancyGuard {
             ((latest - previous) * BASIS_POINTS) / previous : 0;
     }
 
-    function _calculateUserParticipationRate() internal view returns (uint256) {
+    function _calculateUserParticipationRate() internal pure returns (uint256) {
         // Mock calculation - would calculate based on active vs total users
         return 8500; // 85% participation rate
     }

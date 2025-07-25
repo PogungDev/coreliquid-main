@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import "../../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 import "./UnifiedLiquidityPool.sol";
 
 /**
@@ -89,7 +89,7 @@ contract CompoundEngine is Ownable, ReentrancyGuard {
     event UserSettingsUpdated(address indexed user, bool autoEnabled, uint256 frequency);
     event CompoundConfigUpdated(uint256 frequency, uint256 minThreshold);
 
-    constructor(address _liquidityPool) {
+    constructor(address _liquidityPool, address initialOwner) Ownable(initialOwner) {
         liquidityPool = UnifiedLiquidityPool(_liquidityPool);
         
         // Initialize default compound configuration
@@ -291,7 +291,7 @@ contract CompoundEngine is Ownable, ReentrancyGuard {
     /**
      * @dev Get users eligible for auto compound
      */
-    function _getEligibleUsers() internal view returns (address[] memory) {
+    function _getEligibleUsers() internal pure returns (address[] memory) {
         // This would typically query the liquidity pool for all users
         // For demo purposes, return empty array
         address[] memory eligible = new address[](0);
@@ -342,9 +342,33 @@ contract CompoundEngine is Ownable, ReentrancyGuard {
     /**
      * @dev Get total pool value from liquidity pool
      */
-    function _getTotalPoolValue() internal view returns (uint256) {
+    function _getTotalPoolValue() internal pure returns (uint256) {
         // This would integrate with the liquidity pool
         return 1000000e18; // $1M for demo
+    }
+
+    /**
+     * @dev Execute automated compounding (alias for autoCompound)
+     */
+    function executeAutomatedCompounding() external {
+        require(compoundConfig.autoCompoundEnabled, "Auto compound disabled");
+        
+        address[] memory eligibleUsers = _getEligibleUsers();
+        
+        if (eligibleUsers.length == 0) return;
+        
+        // Process in batches for gas optimization
+        uint256 batchSize = compoundConfig.batchSize;
+        for (uint256 i = 0; i < eligibleUsers.length; i += batchSize) {
+            uint256 endIndex = Math.min(i + batchSize, eligibleUsers.length);
+            address[] memory batch = new address[](endIndex - i);
+            
+            for (uint256 j = i; j < endIndex; j++) {
+                batch[j - i] = eligibleUsers[j];
+            }
+            
+            _processBatch(batch);
+        }
     }
 
     // View functions

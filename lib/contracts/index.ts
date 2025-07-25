@@ -2,14 +2,18 @@
 import { ethers } from 'ethers'
 import { APRMetrics, RevenueMetrics, AutomationStatus, RiskMetrics, ULPData, PerformanceData } from '../../contexts/portfolio-context'
 
-// Contract addresses (to be updated with deployed addresses)
+// Contract addresses from environment variables
 export const CONTRACT_ADDRESSES = {
-  UNIFIED_LIQUIDITY_POOL: '0x0000000000000000000000000000000000000000',
-  DYNAMIC_REBALANCER: '0x0000000000000000000000000000000000000000',
-  COMPOUND_ENGINE: '0x0000000000000000000000000000000000000000',
-  APR_CALCULATOR: '0x0000000000000000000000000000000000000000',
-  REVENUE_MODEL: '0x0000000000000000000000000000000000000000',
-  ZERO_TOUCH_AUTOMATION: '0x0000000000000000000000000000000000000000',
+  UNIFIED_LIQUIDITY_POOL: process.env.NEXT_PUBLIC_UNIFIED_LIQUIDITY_POOL || '0x50EEf481cae4250d252Ae577A09bF514f224C6C4',
+  REVENUE_MODEL: process.env.NEXT_PUBLIC_REVENUE_MODEL || '0xDEb1E9a6Be7Baf84208BB6E10aC9F9bbE1D70809',
+  APR_CALCULATOR: process.env.NEXT_PUBLIC_APR_OPTIMIZER || '0xd21060559c9beb54fC07aFd6151aDf6cFCDDCAeB',
+  CORE_LIQUID_PROTOCOL: process.env.NEXT_PUBLIC_CORE_LIQUID_PROTOCOL || '0x978e3286EB805934215a88694d80b09aDed68D90',
+  STCORE_TOKEN: process.env.NEXT_PUBLIC_STCORE_TOKEN || '0xBb2180ebd78ce97360503434eD37fcf4a1Df61c3',
+  CORE_NATIVE_STAKING: process.env.NEXT_PUBLIC_CORE_NATIVE_STAKING || '0xDB8cFf278adCCF9E9b5da745B44E754fC4EE3C76',
+  DEPOSIT_MANAGER: process.env.NEXT_PUBLIC_DEPOSIT_MANAGER || '0x4f559F30f5eB88D635FDe1548C4267DB8FaB0351',
+  LENDING_MARKET: process.env.NEXT_PUBLIC_LENDING_MARKET || '0x416C42991d05b31E9A6dC209e91AD22b79D87Ae6',
+  RISK_ENGINE: process.env.NEXT_PUBLIC_RISK_ENGINE || '0xD718d5A27a29FF1cD22403426084bA0d479869a0',
+  POSITION_NFT: process.env.NEXT_PUBLIC_POSITION_NFT || '0x4C52a6277b1B84121b3072C0c92b6Be0b7CC10F1',
 }
 
 // Contract ABIs (simplified for demo - should include full ABIs)
@@ -22,34 +26,9 @@ export const CONTRACT_ABIS = {
     'function getTotalValue() external view returns (uint256)',
     'function getCapitalEfficiency() external view returns (uint256)',
     'function getTokenAllocations() external view returns (tuple(address token, uint256 amount, uint256 percentage)[])',
+    'function totalShares() external view returns (uint256)',
     'event Deposit(address indexed user, address indexed token, uint256 amount, uint256 shares)',
     'event Withdraw(address indexed user, uint256 shares, uint256 amount)',
-  ],
-  
-  DYNAMIC_REBALANCER: [
-    'function executeRebalance() external',
-    'function getLastRebalance() external view returns (uint256)',
-    'function getNextRebalance() external view returns (uint256)',
-    'function getRebalanceThreshold() external view returns (uint256)',
-    'function updateMarketConditions(uint256 volatility, uint256 liquidity) external',
-    'event RebalanceExecuted(uint256 timestamp, uint256 gasUsed)',
-  ],
-  
-  COMPOUND_ENGINE: [
-    'function setUserCompoundConfig(uint256 frequency, bool autoCompound) external',
-    'function executeCompound(address user) external',
-    'function getUserCompoundConfig(address user) external view returns (tuple(uint256 frequency, bool autoCompound, uint256 lastCompound))',
-    'function calculateCompoundAmount(address user) external view returns (uint256)',
-    'event CompoundExecuted(address indexed user, uint256 amount, uint256 timestamp)',
-  ],
-  
-  APR_CALCULATOR: [
-    'function getCurrentAPR() external view returns (uint256)',
-    'function getHistoricalAPR(uint256 days) external view returns (uint256)',
-    'function getAPRBreakdown() external view returns (tuple(uint256 tradingFees, uint256 arbitrageProfits, uint256 liquidationFees, uint256 yieldFarming, uint256 compoundBonus))',
-    'function getVolatilityAdjustedAPR() external view returns (uint256)',
-    'function getProjectedAPR() external view returns (uint256, uint256)', // returns (apr, confidence)
-    'event APRUpdated(uint256 newAPR, uint256 timestamp)',
   ],
   
   REVENUE_MODEL: [
@@ -61,14 +40,55 @@ export const CONTRACT_ABIS = {
     'event RewardsClaimed(address indexed user, uint256 amount, uint256 timestamp)',
   ],
   
-  ZERO_TOUCH_AUTOMATION: [
+  APR_CALCULATOR: [
+    'function getCurrentAPR() external view returns (uint256)',
+    'function getHistoricalAPR(uint256 days) external view returns (uint256)',
+    'function getAPRBreakdown() external view returns (tuple(uint256 tradingFees, uint256 arbitrageProfits, uint256 liquidationFees, uint256 yieldFarming, uint256 compoundBonus))',
+    'function getVolatilityAdjustedAPR() external view returns (uint256)',
+    'function getProjectedAPR() external view returns (uint256, uint256)', // returns (apr, confidence)
+    'event APRUpdated(uint256 newAPR, uint256 timestamp)',
+  ],
+  
+  CORE_LIQUID_PROTOCOL: [
     'function getAutomationStatus() external view returns (tuple(bool isEnabled, bool inEmergencyMode, uint256 activeTasks, uint256 totalExecutions, uint256 successRate, uint256 averageGas, uint256 uptime, uint256 lastExecution))',
     'function getNextScheduledTasks() external view returns (tuple(string taskType, uint256 scheduledTime, uint256 priority, uint256 estimatedGas)[])',
     'function getMarketCondition() external view returns (tuple(uint256 volatilityIndex, uint256 liquidityLevel, uint256 riskLevel, bool emergencyMode))',
     'function emergencyStop(string reason) external',
     'function resumeAutomation() external',
+    'function executeRebalance() external',
+    'function getLastRebalance() external view returns (uint256)',
+    'function getNextRebalance() external view returns (uint256)',
+    'function getRebalanceThreshold() external view returns (uint256)',
+    'function setUserCompoundConfig(uint256 frequency, bool autoCompound) external',
+    'function executeCompound(address user) external',
+    'function getUserCompoundConfig(address user) external view returns (tuple(uint256 frequency, bool autoCompound, uint256 lastCompound))',
     'event AutomationExecuted(string taskType, uint256 timestamp, uint256 gasUsed)',
     'event EmergencyStop(string reason, uint256 timestamp)',
+    'event RebalanceExecuted(uint256 timestamp, uint256 gasUsed)',
+    'event CompoundExecuted(address indexed user, uint256 amount, uint256 timestamp)',
+  ],
+  
+  STCORE_TOKEN: [
+    'function balanceOf(address account) external view returns (uint256)',
+    'function totalSupply() external view returns (uint256)',
+    'function transfer(address to, uint256 amount) external returns (bool)',
+    'function approve(address spender, uint256 amount) external returns (bool)',
+    'function allowance(address owner, address spender) external view returns (uint256)',
+    'function exchangeRate() external view returns (uint256)',
+    'event Transfer(address indexed from, address indexed to, uint256 value)',
+    'event Approval(address indexed owner, address indexed spender, uint256 value)',
+  ],
+  
+  CORE_NATIVE_STAKING: [
+    'function stakeCORE(uint256 amount) external',
+    'function stakeBTC(uint256 amount) external',
+    'function unstakeCORE(uint256 shares) external',
+    'function claimRewards() external',
+    'function redeemBTC(uint256 amount) external',
+    'function getUserStakeInfo(address user) external view returns (tuple(uint256 coreStaked, uint256 btcStaked, uint256 rewards, uint256 tier))',
+    'event CoreStaked(address indexed user, uint256 amount, uint256 shares)',
+    'event BTCStaked(address indexed user, uint256 amount)',
+    'event RewardsClaimed(address indexed user, uint256 amount)',
   ],
 }
 
@@ -108,7 +128,7 @@ export class CoreFluidXContracts {
 
   async getULPData(userAddress: string): Promise<ULPData> {
     const contract = this.contracts.UNIFIED_LIQUIDITY_POOL
-    const rebalancer = this.contracts.DYNAMIC_REBALANCER
+    const protocolContract = this.contracts.CORE_LIQUID_PROTOCOL
     
     const [userShares, sharePrice, totalValue, capitalEfficiency, tokenAllocations, lastRebalance, nextRebalance, rebalanceThreshold] = await Promise.all([
       contract.getUserShares(userAddress),
@@ -116,9 +136,9 @@ export class CoreFluidXContracts {
       contract.getTotalValue(),
       contract.getCapitalEfficiency(),
       contract.getTokenAllocations(),
-      rebalancer.getLastRebalance(),
-      rebalancer.getNextRebalance(),
-      rebalancer.getRebalanceThreshold(),
+      protocolContract.getLastRebalance(),
+      protocolContract.getNextRebalance(),
+      protocolContract.getRebalanceThreshold(),
     ])
 
     // Process token allocations
@@ -223,7 +243,7 @@ export class CoreFluidXContracts {
 
   // Automation Operations
   async getAutomationStatus(): Promise<AutomationStatus> {
-    const contract = this.contracts.ZERO_TOUCH_AUTOMATION
+    const contract = this.contracts.CORE_LIQUID_PROTOCOL
     
     const [status, nextTasks, marketCondition] = await Promise.all([
       contract.getAutomationStatus(),
@@ -256,35 +276,35 @@ export class CoreFluidXContracts {
   }
 
   async emergencyStop(reason: string): Promise<ethers.TransactionResponse> {
-    const contract = this.contracts.ZERO_TOUCH_AUTOMATION
+    const contract = this.contracts.CORE_LIQUID_PROTOCOL
     return await contract.emergencyStop(reason)
   }
 
   // Compound Operations
   async setCompoundConfig(frequency: number, autoCompound: boolean): Promise<ethers.TransactionResponse> {
-    const contract = this.contracts.COMPOUND_ENGINE
+    const contract = this.contracts.CORE_LIQUID_PROTOCOL
     return await contract.setUserCompoundConfig(frequency, autoCompound)
   }
 
   async executeCompound(userAddress: string): Promise<ethers.TransactionResponse> {
-    const contract = this.contracts.COMPOUND_ENGINE
+    const contract = this.contracts.CORE_LIQUID_PROTOCOL
     return await contract.executeCompound(userAddress)
   }
 
   // Rebalance Operations
   async executeRebalance(): Promise<ethers.TransactionResponse> {
-    const contract = this.contracts.DYNAMIC_REBALANCER
+    const contract = this.contracts.CORE_LIQUID_PROTOCOL
     return await contract.executeRebalance()
   }
 
   async pauseRebalancing(): Promise<ethers.TransactionResponse> {
-    const contract = this.contracts.DYNAMIC_REBALANCER
-    return await contract.pauseRebalancing()
+    const contract = this.contracts.CORE_LIQUID_PROTOCOL
+    return await contract.resumeAutomation()
   }
 
   async resumeRebalancing(): Promise<ethers.TransactionResponse> {
-    const contract = this.contracts.DYNAMIC_REBALANCER
-    return await contract.resumeRebalancing()
+    const contract = this.contracts.CORE_LIQUID_PROTOCOL
+    return await contract.resumeAutomation()
   }
 
   // Risk Metrics (calculated from various sources)
@@ -344,11 +364,11 @@ export class CoreFluidXContracts {
     }
     
     if (callbacks.onRebalance) {
-      this.contracts.DYNAMIC_REBALANCER.on('RebalanceExecuted', callbacks.onRebalance)
+      this.contracts.CORE_LIQUID_PROTOCOL.on('RebalanceExecuted', callbacks.onRebalance)
     }
     
     if (callbacks.onCompound) {
-      this.contracts.COMPOUND_ENGINE.on('CompoundExecuted', callbacks.onCompound)
+      this.contracts.CORE_LIQUID_PROTOCOL.on('CompoundExecuted', callbacks.onCompound)
     }
     
     if (callbacks.onRevenueDistribution) {
@@ -356,11 +376,11 @@ export class CoreFluidXContracts {
     }
     
     if (callbacks.onAutomationExecuted) {
-      this.contracts.ZERO_TOUCH_AUTOMATION.on('AutomationExecuted', callbacks.onAutomationExecuted)
+      this.contracts.CORE_LIQUID_PROTOCOL.on('AutomationExecuted', callbacks.onAutomationExecuted)
     }
     
     if (callbacks.onEmergencyStop) {
-      this.contracts.ZERO_TOUCH_AUTOMATION.on('EmergencyStop', callbacks.onEmergencyStop)
+      this.contracts.CORE_LIQUID_PROTOCOL.on('EmergencyStop', callbacks.onEmergencyStop)
     }
   }
 

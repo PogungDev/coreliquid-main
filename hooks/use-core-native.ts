@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useAccount, useContractRead, useContractWrite, usePrepareContractWrite } from 'wagmi'
+import { useAccount, useContractRead, useWriteContract } from 'wagmi'
 import { parseEther, formatEther } from 'viem'
 import { toast } from 'sonner'
 
@@ -172,10 +172,10 @@ const CORE_VALIDATOR_ABI = [
   }
 ] as const
 
-// Contract addresses (these would be deployed addresses)
-const CORE_NATIVE_STAKING_ADDRESS = '0x0000000000000000000000000000000000000000' // Placeholder
-const STCORE_TOKEN_ADDRESS = '0x0000000000000000000000000000000000000000' // Placeholder
-const CORE_VALIDATOR_ADDRESS = '0x0000000000000000000000000000000000000000' // Placeholder
+// Contract addresses from environment variables
+const CORE_NATIVE_STAKING_ADDRESS = process.env.NEXT_PUBLIC_CORE_NATIVE_STAKING || '0xDB8cFf278adCCF9E9b5da745B44E754fC4EE3C76'
+const STCORE_TOKEN_ADDRESS = process.env.NEXT_PUBLIC_STCORE_TOKEN || '0xBb2180ebd78ce97360503434eD37fcf4a1Df61c3'
+const CORE_VALIDATOR_ADDRESS = '0x0000000000000000000000000000000000000000' // Core Chain native validator contract
 
 interface BTCStakingPosition {
   btcTxHash: string
@@ -248,136 +248,55 @@ export function useCoreNative() {
   const [dualStakingTiers, setDualStakingTiers] = useState<DualStakingTier[]>([])
   const [protocolStats, setProtocolStats] = useState<ProtocolStats | null>(null)
 
+  const { writeContract } = useWriteContract()
+
   // Read user staking info
   const { data: userStakingData, refetch: refetchStakingInfo } = useContractRead({
-    address: CORE_NATIVE_STAKING_ADDRESS,
+    address: CORE_NATIVE_STAKING_ADDRESS as `0x${string}`,
     abi: CORE_NATIVE_STAKING_ABI,
     functionName: 'getUserStakingInfo',
     args: address ? [address] : undefined,
-    enabled: !!address,
+    query: {
+      enabled: !!address,
+    },
   })
 
   // Read stCORE exchange rate
   const { data: exchangeRate } = useContractRead({
-    address: STCORE_TOKEN_ADDRESS,
+    address: STCORE_TOKEN_ADDRESS as `0x${string}`,
     abi: STCORE_TOKEN_ABI,
     functionName: 'getExchangeRate',
   })
 
   // Read stCORE APY
   const { data: stCoreAPY } = useContractRead({
-    address: STCORE_TOKEN_ADDRESS,
+    address: STCORE_TOKEN_ADDRESS as `0x${string}`,
     abi: STCORE_TOKEN_ABI,
     functionName: 'getCurrentAPY',
   })
 
   // Read dual staking tiers
   const { data: tiersData } = useContractRead({
-    address: CORE_NATIVE_STAKING_ADDRESS,
+    address: CORE_NATIVE_STAKING_ADDRESS as `0x${string}`,
     abi: CORE_NATIVE_STAKING_ABI,
     functionName: 'getDualStakingTiers',
   })
 
   // Read active validators
   const { data: activeValidators } = useContractRead({
-    address: CORE_VALIDATOR_ADDRESS,
+    address: CORE_VALIDATOR_ADDRESS as `0x${string}`,
     abi: CORE_VALIDATOR_ABI,
     functionName: 'getActiveValidators',
   })
 
   // Read protocol stats
   const { data: protocolStatsData } = useContractRead({
-    address: STCORE_TOKEN_ADDRESS,
+    address: STCORE_TOKEN_ADDRESS as `0x${string}`,
     abi: STCORE_TOKEN_ABI,
     functionName: 'getProtocolStats',
   })
 
   // BTC Staking
-  const { config: btcStakeConfig } = usePrepareContractWrite({
-    address: CORE_NATIVE_STAKING_ADDRESS,
-    abi: CORE_NATIVE_STAKING_ABI,
-    functionName: 'stakeBTC',
-  })
-  const { write: stakeBTC } = useContractWrite(btcStakeConfig)
-
-  // CORE Staking
-  const { config: coreStakeConfig } = usePrepareContractWrite({
-    address: CORE_NATIVE_STAKING_ADDRESS,
-    abi: CORE_NATIVE_STAKING_ABI,
-    functionName: 'stakeCORE',
-  })
-  const { write: stakeCORE } = useContractWrite(coreStakeConfig)
-
-  // CORE Unstaking
-  const { config: coreUnstakeConfig } = usePrepareContractWrite({
-    address: CORE_NATIVE_STAKING_ADDRESS,
-    abi: CORE_NATIVE_STAKING_ABI,
-    functionName: 'unstakeCORE',
-  })
-  const { write: unstakeCORE } = useContractWrite(coreUnstakeConfig)
-
-  // Claim Rewards
-  const { config: claimConfig } = usePrepareContractWrite({
-    address: CORE_NATIVE_STAKING_ADDRESS,
-    abi: CORE_NATIVE_STAKING_ABI,
-    functionName: 'claimRewards',
-  })
-  const { write: claimRewards } = useContractWrite(claimConfig)
-
-  // BTC Redeem
-  const { config: redeemConfig } = usePrepareContractWrite({
-    address: CORE_NATIVE_STAKING_ADDRESS,
-    abi: CORE_NATIVE_STAKING_ABI,
-    functionName: 'redeemBTC',
-  })
-  const { write: redeemBTC } = useContractWrite(redeemConfig)
-
-  // Validator Delegation
-  const { config: delegateConfig } = usePrepareContractWrite({
-    address: CORE_VALIDATOR_ADDRESS,
-    abi: CORE_VALIDATOR_ABI,
-    functionName: 'delegateToValidator',
-  })
-  const { write: delegateToValidator } = useContractWrite(delegateConfig)
-
-  // Update state when data changes
-  useEffect(() => {
-    if (userStakingData) {
-      setStakingInfo({
-        btcStaked: userStakingData[0],
-        coreStaked: userStakingData[1],
-        stCoreBalance: userStakingData[2],
-        pendingReward: userStakingData[3],
-        activeBTCPositions: userStakingData[4],
-        activeCorePositions: userStakingData[5],
-      })
-    }
-  }, [userStakingData])
-
-  useEffect(() => {
-    if (tiersData) {
-      setDualStakingTiers(tiersData.map((tier: any) => ({
-        corePerBTC: tier.corePerBTC,
-        multiplier: tier.multiplier,
-        tierName: tier.tierName,
-      })))
-    }
-  }, [tiersData])
-
-  useEffect(() => {
-    if (protocolStatsData) {
-      setProtocolStats({
-        totalStaked: protocolStatsData[0],
-        totalSupply: protocolStatsData[1],
-        exchangeRate: protocolStatsData[2],
-        currentAPY: protocolStatsData[3],
-        totalRewards: protocolStatsData[4],
-        currentEpoch: protocolStatsData[5],
-      })
-    }
-  }, [protocolStatsData])
-
-  // Stake BTC with dual staking
   const handleBTCStake = useCallback(async (
     btcTxHash: string,
     btcAmount: string,
@@ -385,7 +304,7 @@ export function useCoreNative() {
     validator: string,
     coreAmount: string
   ) => {
-    if (!stakeBTC) {
+    if (!writeContract) {
       toast.error('Contract not ready')
       return
     }
@@ -396,11 +315,15 @@ export function useCoreNative() {
       const coreAmountWei = coreAmount ? parseEther(coreAmount) : BigInt(0)
       const lockTime = BigInt(lockDays * 24 * 6) // Convert days to Bitcoin blocks
 
-      await stakeBTC({
+      await writeContract({
+        address: CORE_NATIVE_STAKING_ADDRESS as `0x${string}`,
+        abi: CORE_NATIVE_STAKING_ABI,
+        functionName: 'stakeBTC',
         args: [btcTxHash as `0x${string}`, btcAmountWei, lockTime, validator as `0x${string}`, coreAmountWei]
       })
 
-      toast.success('BTC staking initiated successfully!')
+      console.log(`🔄 BTC Staking Transaction Submitted`)
+      toast.success(`BTC staking initiated successfully!`)
       await refetchStakingInfo()
     } catch (error) {
       console.error('BTC staking failed:', error)
@@ -408,14 +331,14 @@ export function useCoreNative() {
     } finally {
       setIsLoading(false)
     }
-  }, [stakeBTC, refetchStakingInfo])
+  }, [writeContract, refetchStakingInfo])
 
   // Stake CORE for liquid staking
   const handleCOREStake = useCallback(async (
     amount: string,
     validator: string
   ) => {
-    if (!stakeCORE) {
+    if (!writeContract) {
       toast.error('Contract not ready')
       return
     }
@@ -424,11 +347,15 @@ export function useCoreNative() {
       setIsLoading(true)
       const amountWei = parseEther(amount)
 
-      await stakeCORE({
+      await writeContract({
+        address: CORE_NATIVE_STAKING_ADDRESS as `0x${string}`,
+        abi: CORE_NATIVE_STAKING_ABI,
+        functionName: 'stakeCORE',
         args: [amountWei, validator as `0x${string}`]
       })
 
-      toast.success('CORE staking successful! You received stCORE tokens.')
+      console.log(`🔄 CORE Staking Transaction Submitted`)
+      toast.success(`CORE staking successful! You received stCORE tokens.`)
       await refetchStakingInfo()
     } catch (error) {
       console.error('CORE staking failed:', error)
@@ -436,14 +363,14 @@ export function useCoreNative() {
     } finally {
       setIsLoading(false)
     }
-  }, [stakeCORE, refetchStakingInfo])
+  }, [writeContract, refetchStakingInfo])
 
   // Unstake CORE
   const handleCOREUnstake = useCallback(async (
     stCoreAmount: string,
     positionIndex: number
   ) => {
-    if (!unstakeCORE) {
+    if (!writeContract) {
       toast.error('Contract not ready')
       return
     }
@@ -452,11 +379,15 @@ export function useCoreNative() {
       setIsLoading(true)
       const stCoreAmountWei = parseEther(stCoreAmount)
 
-      await unstakeCORE({
+      await writeContract({
+        address: CORE_NATIVE_STAKING_ADDRESS as `0x${string}`,
+        abi: CORE_NATIVE_STAKING_ABI,
+        functionName: 'unstakeCORE',
         args: [stCoreAmountWei, BigInt(positionIndex)]
       })
 
-      toast.success('CORE unstaking successful!')
+      console.log(`🔄 CORE Unstaking Transaction Submitted`)
+      toast.success(`CORE unstaking successful!`)
       await refetchStakingInfo()
     } catch (error) {
       console.error('CORE unstaking failed:', error)
@@ -464,18 +395,22 @@ export function useCoreNative() {
     } finally {
       setIsLoading(false)
     }
-  }, [unstakeCORE, refetchStakingInfo])
+  }, [writeContract, refetchStakingInfo])
 
   // Claim staking rewards
   const handleClaimRewards = useCallback(async () => {
-    if (!claimRewards) {
+    if (!writeContract) {
       toast.error('Contract not ready')
       return
     }
 
     try {
       setIsLoading(true)
-      await claimRewards()
+      await writeContract({
+        address: CORE_NATIVE_STAKING_ADDRESS as `0x${string}`,
+        abi: CORE_NATIVE_STAKING_ABI,
+        functionName: 'claimRewards',
+      })
       toast.success('Rewards claimed successfully!')
       await refetchStakingInfo()
     } catch (error) {
@@ -484,18 +419,21 @@ export function useCoreNative() {
     } finally {
       setIsLoading(false)
     }
-  }, [claimRewards, refetchStakingInfo])
+  }, [writeContract, refetchStakingInfo])
 
   // Redeem BTC after lock period
   const handleBTCRedeem = useCallback(async (positionIndex: number) => {
-    if (!redeemBTC) {
+    if (!writeContract) {
       toast.error('Contract not ready')
       return
     }
 
     try {
       setIsLoading(true)
-      await redeemBTC({
+      await writeContract({
+        address: CORE_NATIVE_STAKING_ADDRESS as `0x${string}`,
+        abi: CORE_NATIVE_STAKING_ABI,
+        functionName: 'redeemBTC',
         args: [BigInt(positionIndex)]
       })
       toast.success('BTC redeemed successfully!')
@@ -506,14 +444,14 @@ export function useCoreNative() {
     } finally {
       setIsLoading(false)
     }
-  }, [redeemBTC, refetchStakingInfo])
+  }, [writeContract, refetchStakingInfo])
 
   // Delegate to validator
   const handleValidatorDelegation = useCallback(async (
     validator: string,
     amount: string
   ) => {
-    if (!delegateToValidator) {
+    if (!writeContract) {
       toast.error('Contract not ready')
       return
     }
@@ -522,7 +460,10 @@ export function useCoreNative() {
       setIsLoading(true)
       const amountWei = parseEther(amount)
 
-      await delegateToValidator({
+      await writeContract({
+        address: CORE_VALIDATOR_ADDRESS as `0x${string}`,
+        abi: CORE_VALIDATOR_ABI,
+        functionName: 'delegateToValidator',
         args: [validator as `0x${string}`, amountWei]
       })
 
@@ -534,7 +475,7 @@ export function useCoreNative() {
     } finally {
       setIsLoading(false)
     }
-  }, [delegateToValidator, refetchStakingInfo])
+  }, [writeContract, refetchStakingInfo])
 
   // Calculate dual staking tier
   const calculateDualStakingTier = useCallback((btcAmount: string, coreAmount: string) => {

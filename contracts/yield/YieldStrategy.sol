@@ -2,12 +2,12 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 import "./YieldAggregator.sol";
 import "./YieldOptimizer.sol";
 
@@ -18,7 +18,7 @@ import "./YieldOptimizer.sol";
 contract YieldStrategy is AccessControl, ReentrancyGuard, Pausable {
     using SafeERC20 for IERC20;
     using Math for uint256;
-    using SafeMath for uint256;
+
     
     bytes32 public constant STRATEGY_MANAGER_ROLE = keccak256("STRATEGY_MANAGER_ROLE");
     bytes32 public constant KEEPER_ROLE = keccak256("KEEPER_ROLE");
@@ -504,7 +504,7 @@ contract YieldStrategy is AccessControl, ReentrancyGuard, Pausable {
     function _executeStrategyWithdraw(
         uint256 strategyId,
         uint256 amount
-    ) internal returns (uint256) {
+    ) internal view returns (uint256) {
         Strategy storage strategy = strategies[strategyId];
         
         if (strategy.strategyType == StrategyType.SINGLE_ASSET) {
@@ -520,7 +520,7 @@ contract YieldStrategy is AccessControl, ReentrancyGuard, Pausable {
         return amount; // Fallback
     }
     
-    function _executeHarvest(uint256 strategyId) internal returns (uint256) {
+    function _executeHarvest(uint256 strategyId) internal view returns (uint256) {
         Strategy storage strategy = strategies[strategyId];
         
         // Simplified harvest logic
@@ -571,7 +571,7 @@ contract YieldStrategy is AccessControl, ReentrancyGuard, Pausable {
     function _withdrawSingleAssetStrategy(
         uint256 strategyId,
         uint256 amount
-    ) internal returns (uint256) {
+    ) internal pure returns (uint256) {
         // Implement single asset withdrawal logic
         return amount;
     }
@@ -579,7 +579,7 @@ contract YieldStrategy is AccessControl, ReentrancyGuard, Pausable {
     function _withdrawDualAssetStrategy(
         uint256 strategyId,
         uint256 amount
-    ) internal returns (uint256) {
+    ) internal pure returns (uint256) {
         // Implement dual asset withdrawal logic
         return amount;
     }
@@ -587,7 +587,7 @@ contract YieldStrategy is AccessControl, ReentrancyGuard, Pausable {
     function _withdrawYieldFarmingStrategy(
         uint256 strategyId,
         uint256 amount
-    ) internal returns (uint256) {
+    ) internal pure returns (uint256) {
         // Implement yield farming withdrawal logic
         return amount;
     }
@@ -595,7 +595,7 @@ contract YieldStrategy is AccessControl, ReentrancyGuard, Pausable {
     function _withdrawLiquidityMiningStrategy(
         uint256 strategyId,
         uint256 amount
-    ) internal returns (uint256) {
+    ) internal pure returns (uint256) {
         // Implement liquidity mining withdrawal logic
         return amount;
     }
@@ -603,7 +603,7 @@ contract YieldStrategy is AccessControl, ReentrancyGuard, Pausable {
     function _executeEmergencyWithdraw(
         uint256 strategyId,
         uint256 amount
-    ) internal returns (uint256) {
+    ) internal view returns (uint256) {
         // Execute emergency withdrawal with minimal processing
         return _executeStrategyWithdraw(strategyId, amount);
     }

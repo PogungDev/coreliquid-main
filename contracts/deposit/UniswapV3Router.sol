@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -69,7 +69,7 @@ contract UniswapV3Router is IERC721Receiver, ReentrancyGuard, Ownable {
         uint256 amount1
     );
     
-    constructor(address _positionManager, address _swapRouter) {
+    constructor(address _positionManager, address _swapRouter, address initialOwner) Ownable(initialOwner) {
         positionManager = _positionManager;
         swapRouter = _swapRouter;
     }

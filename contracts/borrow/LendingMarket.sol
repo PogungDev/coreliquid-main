@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "../common/OracleRouter.sol";
 // import "./CollateralAdapter.sol"; // CollateralAdapter functionality integrated into CollateralManager
 
@@ -107,7 +107,7 @@ contract LendingMarket is ReentrancyGuard {
     
     function getBorrowableAmount(address user, address collateralToken) 
         public 
-        view 
+        pure 
         returns (uint256) 
     {
         // return collateralAdapter.getBorrowableAmount(user, collateralToken); // Use CollateralManager instead

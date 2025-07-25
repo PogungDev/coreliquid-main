@@ -2,9 +2,9 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+
 import "./YieldAggregator.sol";
 
 /**
@@ -13,7 +13,7 @@ import "./YieldAggregator.sol";
  */
 contract YieldOptimizer is AccessControl, ReentrancyGuard {
     using Math for uint256;
-    using SafeMath for uint256;
+
     
     bytes32 public constant OPTIMIZER_ROLE = keccak256("OPTIMIZER_ROLE");
     bytes32 public constant STRATEGY_ROLE = keccak256("STRATEGY_ROLE");
@@ -500,7 +500,7 @@ contract YieldOptimizer is AccessControl, ReentrancyGuard {
         RiskProfile memory riskProfile,
         MarketCondition memory marketCondition,
         OptimizationModel storage model
-    ) internal view returns (uint256[] memory) {
+    ) internal pure returns (uint256[] memory) {
         uint256[] memory allocations = new uint256[](sources.length);
         
         if (sources.length == 0) {

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 // import "./APRCalculator.sol"; // APRCalculator functionality integrated into core contracts
 
@@ -77,7 +77,7 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
         uint256 minConfidence
     );
     
-    constructor(address _aprCalculator) {
+    constructor(address /* _aprCalculator */) {
         // require(_aprCalculator != address(0), "Invalid APR calculator"); // Functionality integrated
         // aprCalculator = APRCalculator(_aprCalculator); // Functionality integrated
         
@@ -220,10 +220,10 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
         address token0,
         address token1,
         uint24 fee,
-        uint256 liquidity,
+        uint256 /* _liquidity */,
         int24 tickLower,
         int24 tickUpper
-    ) internal view returns (uint256) {
+    ) internal pure returns (uint256) {
         // Get current pool data
         uint256 volume24h = _getPoolVolume24h(token0, token1, fee);
         uint256 tvl = _getPoolTVL(token0, token1, fee);
@@ -253,10 +253,9 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
     /**
      * @dev Get 24h trading volume for a pool
      */
-    function _getPoolVolume24h(address token0, address token1, uint24 fee) internal view returns (uint256) {
+    function _getPoolVolume24h(address token0, address token1, uint24 fee) internal pure returns (uint256) {
         // In production, this would query Uniswap V3 subgraph or oracle
         // For now, return mock data based on pool characteristics
-        bytes32 poolHash = _getPoolHash(token0, token1);
         uint256 baseVolume = 1000000e18; // $1M base volume
         
         // Adjust based on fee tier (lower fees = higher volume typically)
@@ -270,7 +269,7 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
     /**
      * @dev Get total value locked in a pool
      */
-    function _getPoolTVL(address token0, address token1, uint24 fee) internal view returns (uint256) {
+    function _getPoolTVL(address /* _token0 */, address /* _token1 */, uint24 /* _fee */) internal pure returns (uint256) {
         // In production, this would query actual pool reserves
         // For now, return mock data
         return 10000000e18; // $10M TVL
@@ -279,7 +278,7 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
     /**
      * @dev Get pool utilization rate
      */
-    function _getPoolUtilization(address token0, address token1, uint24 fee) internal view returns (uint256) {
+    function _getPoolUtilization(address /* _token0 */, address /* _token1 */, uint24 /* _fee */) internal pure returns (uint256) {
         // Calculate utilization as borrowed / (supplied + borrowed)
         // For now, return mock data between 50-90%
         return 75 * PRECISION / 100; // 75% utilization
@@ -312,7 +311,7 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
     /**
      * @dev Calculate additional farming rewards
      */
-    function _calculateFarmingRewards(address token0, address token1, uint24 fee) internal view returns (uint256) {
+    function _calculateFarmingRewards(address /* _token0 */, address /* _token1 */, uint24 /* _fee */) internal pure returns (uint256) {
         // In production, this would check for active liquidity mining programs
         // For now, return base farming rewards
         return 2 * PRECISION / 100; // 2% additional APR from farming
@@ -338,7 +337,7 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
     function _evaluateStrategy(
         StrategyOption memory strategy,
         OptimizationParams memory params
-    ) internal view returns (uint256 score) {
+    ) internal pure returns (uint256 score) {
         // Base score from expected APR (0-100)
         score = (strategy.expectedAPR * 100) / (50 * PRECISION / 100); // Normalize to 50% APR = 100 points
         if (score > 100) score = 100;
@@ -382,10 +381,10 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
         // Simple compound interest calculation
         // Returns = Principal * (1 + APR/365)^days - Principal
         uint256 dailyRate = strategy.expectedAPR / 365;
-        uint256 days = timeHorizon / 1 days;
+        uint256 daysCount = timeHorizon / 86400; // 1 day = 86400 seconds
         
         // Simplified compound calculation (avoiding complex exponentiation)
-        uint256 totalReturn = (principal * dailyRate * days) / PRECISION;
+        uint256 totalReturn = (principal * dailyRate * daysCount) / PRECISION;
         
         // Add compounding effect (approximation)
         uint256 compoundingBonus = (totalReturn * totalReturn) / (principal * 2);
@@ -442,19 +441,6 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
     {
         bytes32 poolHash = _getPoolHash(token0, token1);
         return optimizationResults[poolHash];
-        strategy.riskScore = newRiskScore;
-        strategy.isActive = isActive;
-        
-        // Recalculate APR
-        // strategy.expectedAPR = aprCalculator.calculateStrategyAPR( // Use integrated APR calculation
-        strategy.expectedAPR = _calculateIntegratedAPR(
-            token0,
-            token1,
-            strategy.fee,
-            1e18,
-            strategy.tickLower,
-            strategy.tickUpper
-        );
     }
     
     function getOptimalStrategy(
@@ -504,39 +490,6 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
         return strategyOptions[poolHash];
     }
     
-    function getOptimizationResult(address token0, address token1)
-        external
-        view
-        returns (OptimizationResult memory)
-    {
-        bytes32 poolHash = _getPoolHash(token0, token1);
-        return optimizationResults[poolHash];
-    }
-    
-    function _evaluateStrategy(
-        StrategyOption memory strategy,
-        OptimizationParams memory params
-    ) internal view returns (uint256 score) {
-        // APR weight (40%)
-        uint256 aprScore = (strategy.expectedAPR * 40) / 100;
-        
-        // Risk weight (30%) - lower risk = higher score
-        uint256 riskScore = ((100 * PRECISION / 100 - strategy.riskScore) * 30) / 100;
-        
-        // Liquidity efficiency weight (20%)
-        uint256 liquidityScore = _calculateLiquidityEfficiency(strategy, params.amount0 + params.amount1) * 20 / 100;
-        
-        // Time horizon weight (10%)
-        uint256 timeScore = _calculateTimeScore(strategy, params.timeHorizon) * 10 / 100;
-        
-        score = aprScore + riskScore + liquidityScore + timeScore;
-        
-        // Apply minimum APR filter
-        if (strategy.expectedAPR < params.minAPR) {
-            score = 0;
-        }
-    }
-    
     function _calculateLiquidityEfficiency(StrategyOption memory strategy, uint256 totalAmount)
         internal
         pure
@@ -563,29 +516,6 @@ contract APROptimizer is AccessControl, ReentrancyGuard {
         } else {
             return 40 * PRECISION / 100;
         }
-    }
-    
-    function _calculateProjectedReturns(
-        StrategyOption memory strategy,
-        uint256 principal,
-        uint32 timeHorizon
-    ) internal pure returns (uint256) {
-        uint256 annualReturns = (principal * strategy.expectedAPR) / PRECISION;
-        return (annualReturns * timeHorizon) / 365 days;
-    }
-    
-    function _calculateLiquidityRequirement(int24 tickLower, int24 tickUpper)
-        internal
-        pure
-        returns (uint256)
-    {
-        // Simple calculation based on tick range
-        uint256 range = uint256(uint24(tickUpper - tickLower));
-        return (1e18 * 1000) / (range + 1); // Inverse relationship
-    }
-    
-    function _getPoolHash(address token0, address token1) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(token0, token1));
     }
     
     function setOptimizationParameters(

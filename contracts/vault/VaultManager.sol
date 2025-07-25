@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -480,7 +480,7 @@ contract VaultManager is AccessControl, ReentrancyGuard, Pausable {
     }
     
     function _depositToStrategy(address strategy, uint256 amount) internal {
-        IERC20(config.asset).safeApprove(strategy, amount);
+        IERC20(config.asset).forceApprove(strategy, amount);
         VaultStrategyBase(strategy).deposit(amount);
         
         strategies[strategy].totalDeposited += amount;
@@ -494,7 +494,7 @@ contract VaultManager is AccessControl, ReentrancyGuard, Pausable {
         
         if (withdrawAmount > 0) {
             // Calculate shares to withdraw (simplified)
-            uint256 shares = (withdrawAmount * VaultStrategyBase(strategy).totalShares) / strategyBalance;
+            uint256 shares = (withdrawAmount * VaultStrategyBase(strategy).totalShares()) / strategyBalance;
             VaultStrategyBase(strategy).withdraw(shares);
             
             strategies[strategy].totalWithdrawn += withdrawAmount;

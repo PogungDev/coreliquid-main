@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./AutoRebalanceManager.sol";
@@ -234,7 +234,7 @@ contract RebalanceFlow is AccessControl, ReentrancyGuard, Pausable {
         }
     }
     
-    function _executeAnalyzeStep(uint256 tokenId, bytes memory data) internal {
+    function _executeAnalyzeStep(uint256 tokenId, bytes memory data) internal view {
         // Get position info
         AutoRebalanceManager.PositionInfo memory position = rebalanceManager.getPositionInfo(tokenId);
         
@@ -248,7 +248,7 @@ contract RebalanceFlow is AccessControl, ReentrancyGuard, Pausable {
         require(tx.gasprice <= config.maxGasPrice, "Gas price too high");
     }
     
-    function _executeOptimizeStep(uint256 tokenId, bytes memory data) internal {
+    function _executeOptimizeStep(uint256 tokenId, bytes memory data) internal view {
         AutoRebalanceManager.PositionInfo memory position = rebalanceManager.getPositionInfo(tokenId);
         
         // Get optimal tick range
@@ -281,7 +281,7 @@ contract RebalanceFlow is AccessControl, ReentrancyGuard, Pausable {
         rebalanceManager.executeRebalance(params);
     }
     
-    function _executeVerifyStep(uint256 tokenId, bytes memory data) internal {
+    function _executeVerifyStep(uint256 tokenId, bytes memory data) internal view {
         // Verify the rebalance was successful
         AutoRebalanceManager.PositionInfo memory position = rebalanceManager.getPositionInfo(tokenId);
         

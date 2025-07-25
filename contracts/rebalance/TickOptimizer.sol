@@ -54,8 +54,8 @@ contract TickOptimizer is AccessControl {
     mapping(int24 => uint256) public tickSpacings;
     
     uint256 public constant PRECISION = 1e18;
-    uint256 public constant MAX_TICK = 887272;
-    uint256 public constant MIN_TICK = -887272;
+    int24 public constant MAX_TICK = 887272;
+    int24 public constant MIN_TICK = -887272;
     uint256 public constant Q96 = 2**96;
     
     // Volatility-based range multipliers
@@ -171,7 +171,6 @@ contract TickOptimizer is AccessControl {
         }
         
         uint256 totalRange = uint256(uint24(tickUpper - tickLower));
-        uint256 activeRange = uint256(uint24(tickUpper - tickLower));
         
         // Simple efficiency calculation
         efficiency = (PRECISION * 1000) / (totalRange + 1);
@@ -184,7 +183,7 @@ contract TickOptimizer is AccessControl {
         uint256 volatility
     ) external pure returns (uint256 impermanentLoss) {
         // Calculate potential impermanent loss based on range width and volatility
-        uint256 rangeWidth = uint256(uint24(tickUpper - tickLower));
+        uint256 rangeWidth = uint256(int256(tickUpper - tickLower).toUint256());
         
         // Wider ranges have lower IL risk
         uint256 baseIL = (volatility * PRECISION) / (rangeWidth + 1000);
@@ -202,7 +201,7 @@ contract TickOptimizer is AccessControl {
         view
         returns (TickRange[] memory candidates)
     {
-        int24 tickSpacing = int24(uint24(tickSpacings[params.fee]));
+        int24 tickSpacing = int24(params.fee);
         require(tickSpacing > 0, "Invalid fee tier");
         
         // Generate ranges based on volatility
@@ -237,7 +236,7 @@ contract TickOptimizer is AccessControl {
     
     function _scoreTickRange(
         TickRange memory range,
-        PoolData memory pool,
+        PoolData memory /* _pool */,
         OptimizationParams memory params
     ) internal pure returns (uint256 score) {
         // Fee generation weight (40%)
@@ -300,9 +299,9 @@ contract TickOptimizer is AccessControl {
         if (remainder == 0) return tick;
         
         if (tick > 0) {
-            return tick - remainder + (remainder >= tickSpacing / 2 ? tickSpacing : 0);
+            return tick - remainder + (remainder >= tickSpacing / 2 ? int24(tickSpacing) : int24(0));
         } else {
-            return tick - remainder - ((-remainder) >= tickSpacing / 2 ? tickSpacing : 0);
+            return tick - remainder - ((-remainder) >= tickSpacing / 2 ? int24(tickSpacing) : int24(0));
         }
     }
     
@@ -312,7 +311,7 @@ contract TickOptimizer is AccessControl {
     
     function setTickSpacing(uint24 fee, int24 spacing) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(spacing > 0, "Invalid spacing");
-        tickSpacings[fee] = uint256(uint24(spacing));
+        tickSpacings[int24(fee)] = uint256(int256(spacing));
     }
     
     function setVolatilityMultiplier(uint256 category, uint256 multiplier) 

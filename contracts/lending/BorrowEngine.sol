@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -475,7 +475,7 @@ contract BorrowEngine is AccessControl, ReentrancyGuard, Pausable {
         market.lastUpdateTime = block.timestamp;
     }
     
-    function _getBorrowValue(address token, uint256 amount) internal view returns (uint256) {
+    function _getBorrowValue(address token, uint256 amount) internal pure returns (uint256) {
         // This would typically use a price oracle
         // For now, assume 1:1 with USD
         return amount;

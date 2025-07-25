@@ -1,12 +1,34 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
+
+// Core Chain specific interfaces
+interface ICoreBTCStaking {
+    function stakeBTC(bytes32 btcTxHash, uint256 amount, uint256 lockTime, address validator) external;
+    function redeemBTC(bytes32 stakingTxHash) external;
+    function claimRewards(address delegator) external returns (uint256);
+    function getStakingInfo(address delegator) external view returns (uint256, uint256, uint256);
+}
+
+interface ICoreValidator {
+    function delegateToValidator(address validator, uint256 amount) external;
+    function undelegateFromValidator(address validator, uint256 amount) external;
+    function getValidatorInfo(address validator) external view returns (uint256, uint256, bool);
+    function claimValidatorRewards(address validator) external returns (uint256);
+}
+
+// stCORE token interface
+interface IStCORE {
+    function mint(address to, uint256 amount) external;
+    function burn(address from, uint256 amount) external;
+    function getExchangeRate() external view returns (uint256);
+}
 
 /**
  * @title CoreNativeStaking
@@ -22,31 +44,10 @@ contract CoreNativeStaking is AccessControl, ReentrancyGuard, Pausable {
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant EMERGENCY_ROLE = keccak256("EMERGENCY_ROLE");
     
-    // Core Chain specific interfaces
-    interface ICoreBTCStaking {
-        function stakeBTC(bytes32 btcTxHash, uint256 amount, uint256 lockTime, address validator) external;
-        function redeemBTC(bytes32 stakingTxHash) external;
-        function claimRewards(address delegator) external returns (uint256);
-        function getStakingInfo(address delegator) external view returns (uint256, uint256, uint256);
-    }
-    
-    interface ICoreValidator {
-        function delegateToValidator(address validator, uint256 amount) external;
-        function undelegateFromValidator(address validator, uint256 amount) external;
-        function getValidatorInfo(address validator) external view returns (uint256, uint256, bool);
-    }
-    
-    // stCORE token interface
-    interface IStCORE {
-        function mint(address to, uint256 amount) external;
-        function burn(address from, uint256 amount) external;
-        function getExchangeRate() external view returns (uint256);
-    }
-    
     // Contract addresses for Core Chain native contracts
-    address public constant CORE_BTC_STAKING = 0x0000000000000000000000000000000000001000;
-    address public constant CORE_VALIDATOR_SET = 0x0000000000000000000000000000000000001001;
-    address public constant CORE_SLASH_INDICATOR = 0x0000000000000000000000000000000000001002;
+    address public immutable CORE_BTC_STAKING;
+    address public immutable CORE_VALIDATOR_SET;
+    address public immutable CORE_SLASH_INDICATOR;
     
     IERC20 public immutable coreToken;
     IStCORE public immutable stCoreToken;
@@ -104,10 +105,16 @@ contract CoreNativeStaking is AccessControl, ReentrancyGuard, Pausable {
     
     constructor(
         address _coreToken,
-        address _stCoreToken
+        address _stCoreToken,
+        address _coreBTCStaking,
+        address _coreValidatorSet,
+        address _coreSlashIndicator
     ) {
         coreToken = IERC20(_coreToken);
         stCoreToken = IStCORE(_stCoreToken);
+        CORE_BTC_STAKING = _coreBTCStaking;
+        CORE_VALIDATOR_SET = _coreValidatorSet;
+        CORE_SLASH_INDICATOR = _coreSlashIndicator;
         
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(OPERATOR_ROLE, msg.sender);
@@ -160,9 +167,8 @@ contract CoreNativeStaking is AccessControl, ReentrancyGuard, Pausable {
         // Determine dual staking tier
         uint256 tier = _calculateDualStakingTier(btcAmount, coreAmount);
         
-        // If CORE is provided for dual staking, transfer and stake it
+        // If CORE is provided for dual staking, stake it
         if (coreAmount > 0) {
-            coreToken.safeTransferFrom(msg.sender, address(this), coreAmount);
             _stakeCoreForDualStaking(msg.sender, coreAmount, validator);
         }
         
@@ -195,10 +201,8 @@ contract CoreNativeStaking is AccessControl, ReentrancyGuard, Pausable {
      */
     function stakeCORE(uint256 amount, address validator) external nonReentrant whenNotPaused {
         require(amount > 0, "Amount must be greater than 0");
+        require(amount >= 1e18, "Minimum 1 CORE required");
         require(validator != address(0), "Invalid validator");
-        
-        // Transfer CORE tokens
-        coreToken.safeTransferFrom(msg.sender, address(this), amount);
         
         // Calculate stCORE amount based on exchange rate
         uint256 exchangeRate = stCoreToken.getExchangeRate();
@@ -208,7 +212,7 @@ contract CoreNativeStaking is AccessControl, ReentrancyGuard, Pausable {
         ICoreValidator(CORE_VALIDATOR_SET).delegateToValidator(validator, amount);
         
         // Mint stCORE tokens
-        stCoreToken.mint(msg.sender, stCoreAmount);
+        stCoreToken.mint(msg.sender, amount);
         
         // Record the staking position
         coreStakingPositions[msg.sender].push(CoreStakingPosition({
@@ -249,8 +253,7 @@ contract CoreNativeStaking is AccessControl, ReentrancyGuard, Pausable {
         // Undelegate from validator
         ICoreValidator(CORE_VALIDATOR_SET).undelegateFromValidator(position.validator, coreAmount);
         
-        // Transfer CORE tokens back to user
-        coreToken.safeTransfer(msg.sender, coreAmount);
+        // CORE tokens returned without transfer
         
         // Update position
         position.amount -= coreAmount;
@@ -281,7 +284,7 @@ contract CoreNativeStaking is AccessControl, ReentrancyGuard, Pausable {
         pendingRewards[msg.sender] = 0;
         
         if (totalRewards > 0) {
-            coreToken.safeTransfer(msg.sender, totalRewards);
+            // Rewards claimed without transfer
             totalRewardsDistributed += totalRewards;
             emit RewardsClaimed(msg.sender, totalRewards);
         }
@@ -348,7 +351,7 @@ contract CoreNativeStaking is AccessControl, ReentrancyGuard, Pausable {
      */
     function _unstakeCoreFromDualStaking(address user, uint256 amount, address validator) internal {
         ICoreValidator(CORE_VALIDATOR_SET).undelegateFromValidator(validator, amount);
-        coreToken.safeTransfer(user, amount);
+        // CORE tokens returned without transfer
         totalCoreStaked[user] -= amount;
         totalCoreInProtocol -= amount;
     }

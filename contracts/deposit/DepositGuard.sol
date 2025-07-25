@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
@@ -16,7 +16,7 @@ contract DepositGuard is ReentrancyGuard, Ownable {
     event TokenSupported(address indexed token, bool supported);
     event DepositValidated(address indexed user, address tokenA, address tokenB, uint256 amtA, uint256 amtB);
     
-    constructor() {}
+    constructor(address initialOwner) Ownable(initialOwner) {}
     
     function setSupportedToken(address token, bool supported) external onlyOwner {
         supportedTokens[token] = supported;

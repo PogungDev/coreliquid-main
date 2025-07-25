@@ -1,21 +1,19 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/Base64.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "lib/openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import "lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import "lib/openzeppelin-contracts/contracts/utils/Base64.sol";
+import "lib/openzeppelin-contracts/contracts/utils/Strings.sol";
 
 /**
  * @title PositionNFT
  * @dev ERC-721 token representing protocol positions
  */
 contract PositionNFT is ERC721, ERC721Enumerable, ERC721URIStorage, AccessControl, Pausable {
-    using Counters for Counters.Counter;
     using Strings for uint256;
     
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -37,7 +35,7 @@ contract PositionNFT is ERC721, ERC721Enumerable, ERC721URIStorage, AccessContro
         bool isActive;
     }
     
-    Counters.Counter private _tokenIdCounter;
+    uint256 private _tokenIdCounter;
     mapping(uint256 => PositionData) public positions;
     mapping(uint256 => uint256) public uniswapToProtocol; // uniswap tokenId -> protocol tokenId
     
@@ -89,8 +87,8 @@ contract PositionNFT is ERC721, ERC721Enumerable, ERC721URIStorage, AccessContro
         require(token0 != address(0) && token1 != address(0), "Invalid tokens");
         require(liquidity > 0, "Invalid liquidity");
         
-        _tokenIdCounter.increment();
-        uint256 tokenId = _tokenIdCounter.current();
+        _tokenIdCounter++;
+        uint256 tokenId = _tokenIdCounter;
         
         positions[tokenId] = PositionData({
             uniswapTokenId: uniswapTokenId,
@@ -126,7 +124,7 @@ contract PositionNFT is ERC721, ERC721Enumerable, ERC721URIStorage, AccessContro
         uint256 newAmount0,
         uint256 newAmount1
     ) external onlyRole(MINTER_ROLE) {
-        require(_exists(tokenId), "Position does not exist");
+        require(_ownerOf(tokenId) != address(0), "Position does not exist");
         require(positions[tokenId].isActive, "Position is not active");
         
         PositionData storage position = positions[tokenId];
@@ -153,7 +151,7 @@ contract PositionNFT is ERC721, ERC721Enumerable, ERC721URIStorage, AccessContro
     }
     
     function deactivatePosition(uint256 tokenId) external onlyRole(MINTER_ROLE) {
-        require(_exists(tokenId), "Position does not exist");
+        require(_ownerOf(tokenId) != address(0), "Position does not exist");
         require(positions[tokenId].isActive, "Position already inactive");
         
         positions[tokenId].isActive = false;
@@ -163,7 +161,7 @@ contract PositionNFT is ERC721, ERC721Enumerable, ERC721URIStorage, AccessContro
     }
     
     function getPosition(uint256 tokenId) external view returns (PositionData memory) {
-        require(_exists(tokenId), "Position does not exist");
+        require(_ownerOf(tokenId) != address(0), "Position does not exist");
         return positions[tokenId];
     }
     
@@ -241,21 +239,33 @@ contract PositionNFT is ERC721, ERC721Enumerable, ERC721URIStorage, AccessContro
         _unpause();
     }
     
-    function _beforeTokenTransfer(
-        address from,
+    function _update(
         address to,
         uint256 tokenId,
-        uint256 batchSize
-    ) internal override(ERC721, ERC721Enumerable) whenNotPaused {
-        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+        address auth
+    ) internal override(ERC721, ERC721Enumerable) whenNotPaused returns (address) {
+        return super._update(to, tokenId, auth);
     }
     
-    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
-        super._burn(tokenId);
+    function _increaseBalance(address account, uint128 value) internal override(ERC721, ERC721Enumerable) {
+        super._increaseBalance(account, value);
+    }
+    
+    // Custom burn function to clean up mappings
+    function burnPosition(uint256 tokenId) external {
+        address owner = _requireOwned(tokenId);
+        require(
+            _msgSender() == owner || 
+            getApproved(tokenId) == _msgSender() || 
+            isApprovedForAll(owner, _msgSender()),
+            "Not approved or owner"
+        );
         
         // Clean up mappings
         delete uniswapToProtocol[positions[tokenId].uniswapTokenId];
         delete positions[tokenId];
+        
+        _burn(tokenId);
     }
     
     function tokenURI(uint256 tokenId)

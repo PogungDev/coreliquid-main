@@ -2,13 +2,13 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "./UnifiedLiquidityPool.sol";
 import "./DynamicRebalancer.sol";
 import "./CompoundEngine.sol";
 // import "./APRCalculator.sol"; // APRCalculator functionality integrated into core contracts
-import "./RevenueModel.sol";
+import "./CoreRevenueModel.sol";
 
 /**
  * @title ZeroTouchAutomation
@@ -105,7 +105,7 @@ contract ZeroTouchAutomation is Ownable, ReentrancyGuard {
     DynamicRebalancer public immutable rebalancer;
     CompoundEngine public immutable compoundEngine;
     // APRCalculator public immutable aprCalculator; // Functionality integrated into core contracts
-    RevenueModel public immutable revenueModel;
+    CoreRevenueModel public immutable revenueModel;
     
     // Automation state
     mapping(uint256 => AutomationTask) public automationTasks;
@@ -170,13 +170,14 @@ contract ZeroTouchAutomation is Ownable, ReentrancyGuard {
         address _rebalancer,
         address _compoundEngine,
         // address _aprCalculator, // APRCalculator functionality integrated
-        address _revenueModel
-    ) {
+        address _revenueModel,
+        address initialOwner
+    ) Ownable(initialOwner) {
         liquidityPool = UnifiedLiquidityPool(_liquidityPool);
         rebalancer = DynamicRebalancer(_rebalancer);
         compoundEngine = CompoundEngine(_compoundEngine);
         // aprCalculator = APRCalculator(_aprCalculator); // Functionality integrated
-        revenueModel = RevenueModel(_revenueModel);
+        revenueModel = CoreRevenueModel(_revenueModel);
         
         // Initialize default optimization strategy
         optimizationStrategy = OptimizationStrategy({
@@ -472,7 +473,10 @@ contract ZeroTouchAutomation is Ownable, ReentrancyGuard {
 
     function _performRebalance(bytes memory) internal returns (bytes memory) {
         // Execute rebalancing through DynamicRebalancer
-        rebalancer.executeOptimalRebalancing();
+        // Use updateMarketConditions with empty arrays as a trigger for rebalancing
+        address[] memory tokens = new address[](0);
+        uint256[] memory prices = new uint256[](0);
+        rebalancer.updateMarketConditions(tokens, prices);
         return abi.encode("Rebalance completed");
     }
 
@@ -491,7 +495,7 @@ contract ZeroTouchAutomation is Ownable, ReentrancyGuard {
         return abi.encode("Revenue distribution completed");
     }
 
-    function _performAPRUpdate(bytes memory) internal returns (bytes memory) {
+    function _performAPRUpdate(bytes memory) internal pure returns (bytes memory) {
         // Update APR calculations
         // aprCalculator.updateAPR(); // APR calculation integrated into core logic
         return abi.encode("APR update completed");
@@ -508,13 +512,13 @@ contract ZeroTouchAutomation is Ownable, ReentrancyGuard {
         return abi.encode("Risk assessment completed");
     }
 
-    function _performLiquidityOptimization(bytes memory) internal returns (bytes memory) {
+    function _performLiquidityOptimization(bytes memory) internal pure returns (bytes memory) {
         // Optimize liquidity allocation
         // This would involve complex logic to optimize capital efficiency
         return abi.encode("Liquidity optimization completed");
     }
 
-    function _performYieldHarvest(bytes memory) internal returns (bytes memory) {
+    function _performYieldHarvest(bytes memory) internal pure returns (bytes memory) {
         // Harvest yields from various sources
         // This would collect yields from external protocols
         return abi.encode("Yield harvest completed");
@@ -549,7 +553,7 @@ contract ZeroTouchAutomation is Ownable, ReentrancyGuard {
         return false;
     }
 
-    function _checkThresholdCondition(TaskType taskType, uint256 threshold) internal view returns (bool) {
+    function _checkThresholdCondition(TaskType taskType, uint256 threshold) internal pure returns (bool) {
         if (taskType == TaskType.REBALANCE) {
             // Check if rebalancing threshold is met
             return true; // Simplified - would check actual deviation
@@ -561,12 +565,12 @@ contract ZeroTouchAutomation is Ownable, ReentrancyGuard {
         return false;
     }
 
-    function _checkEventCondition(TaskType taskType) internal view returns (bool) {
+    function _checkEventCondition(TaskType taskType) internal pure returns (bool) {
         // Check for specific events that should trigger execution
         return false; // Simplified implementation
     }
 
-    function _checkCustomCondition(TaskType taskType, bytes memory conditionData) internal view returns (bool) {
+    function _checkCustomCondition(TaskType taskType, bytes memory conditionData) internal pure returns (bool) {
         // Check custom conditions based on task data
         return false; // Simplified implementation
     }

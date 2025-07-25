@@ -29,7 +29,7 @@ contract RatioCalculator is Ownable {
         uint256 ratio
     );
     
-    constructor() {}
+    constructor(address initialOwner) Ownable(initialOwner) {}
     
     function setSlippageTolerance(uint256 _tolerance) external onlyOwner {
         require(_tolerance <= 1000, "Max 10% slippage"); // Max 10%
@@ -41,7 +41,7 @@ contract RatioCalculator is Ownable {
         uint256 amtB,
         uint256 reserveA,
         uint256 reserveB
-    ) external view returns (uint256 optA, uint256 optB) {
+    ) external returns (uint256 optA, uint256 optB) {
         require(amtA > 0 || amtB > 0, "Invalid amounts");
         require(reserveA > 0 && reserveB > 0, "Invalid reserves");
         

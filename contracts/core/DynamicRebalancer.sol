@@ -70,7 +70,7 @@ contract DynamicRebalancer is Ownable {
     event MarketConditionUpdated(uint256 volatilityIndex, uint256 trendDirection);
     event EmergencyRebalance(address indexed token, uint256 amount, string reason);
 
-    constructor(address _liquidityPool) {
+    constructor(address _liquidityPool, address initialOwner) Ownable(initialOwner) {
         liquidityPool = UnifiedLiquidityPool(_liquidityPool);
         _initializeStrategies();
     }
@@ -337,13 +337,13 @@ contract DynamicRebalancer is Ownable {
         return activeTokens > 0 ? totalVolatility / activeTokens : 0;
     }
 
-    function _calculateTrendDirection() internal view returns (uint256) {
+    function _calculateTrendDirection() internal pure returns (uint256) {
         // Simplified trend calculation based on recent price movements
         // In production, this would use more sophisticated technical analysis
         return 5000; // Neutral trend for demo
     }
 
-    function _calculateLiquidityDepth() internal view returns (uint256) {
+    function _calculateLiquidityDepth() internal pure returns (uint256) {
         // Calculate available liquidity across all supported tokens
         return _getTotalPoolValue();
     }
@@ -354,17 +354,17 @@ contract DynamicRebalancer is Ownable {
         return 3000; // 30% correlation for demo
     }
 
-    function _getCurrentWeight(address token) internal view returns (uint256) {
+    function _getCurrentWeight(address token) internal pure returns (uint256) {
         // This would integrate with the liquidity pool to get current weights
         return 2500; // 25% weight for demo
     }
 
-    function _getTargetWeight(address token) internal view returns (uint256) {
+    function _getTargetWeight(address token) internal pure returns (uint256) {
         // This would get target weights from pool configuration
         return 2500; // 25% target weight for demo
     }
 
-    function _getTotalPoolValue() internal view returns (uint256) {
+    function _getTotalPoolValue() internal pure returns (uint256) {
         // Get total pool value from liquidity pool
         return 1000000e18; // $1M for demo
     }

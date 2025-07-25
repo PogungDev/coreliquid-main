@@ -16,7 +16,24 @@
     "build": "next build",
     "dev": "next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "test": "forge test",
+    "test:unit": "forge test --match-path 'test/unit/**/*.sol'",
+    "test:integration": "forge test --match-path 'test/integration/**/*.sol'",
+    "test:coverage": "forge coverage",
+    "test:gas": "forge test --gas-report",
+    "test:watch": "forge test --watch",
+    "test:verbose": "forge test -vvv",
+    "test:core-native": "forge test --match-contract CoreNativeStakingTest",
+    "test:stcore": "forge test --match-contract StCORETokenTest",
+    "test:revenue": "forge test --match-contract RevenueModelTest",
+    "test:liquidity": "forge test --match-contract UnifiedLiquidityPoolTest",
+    "test:integration-full": "forge test --match-contract CoreLiquidIntegrationTest",
+    "compile": "forge build",
+    "clean": "forge clean",
+    "install-forge": "forge install",
+    "deploy:core-testnet": "forge script script/Deploy.s.sol --rpc-url core_testnet --broadcast --verify",
+    "deploy:core-mainnet": "forge script script/Deploy.s.sol --rpc-url core --broadcast --verify"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -41,6 +58,8 @@
     "@radix-ui/react-toggle": "latest",
     "@radix-ui/react-toggle-group": "latest",
     "@radix-ui/react-tooltip": "latest",
+    "@rainbow-me/rainbowkit": "^2.2.4",
+    "@tanstack/react-query": "^5.55.3",
     "autoprefixer": "^10.4.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -58,14 +77,13 @@
     "tailwindcss-animate": "^1.0.7",
     "viem": "^2.33.0",
     "wagmi": "^2.16.0",
-    "zod": "^3.24.1",
-    "@rainbow-me/rainbowkit": "^2.2.4",
-    "@tanstack/react-query": "^5.55.3"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "hardhat": "^2.26.1",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"

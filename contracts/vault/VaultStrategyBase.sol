@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/Math.sol";
+import "../../lib/openzeppelin-contracts/contracts/access/AccessControl.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/ReentrancyGuard.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/Pausable.sol";
+import "../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+import "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 /**
  * @title VaultStrategyBase
@@ -406,11 +406,11 @@ abstract contract VaultStrategyBase is AccessControl, ReentrancyGuard, Pausable 
     
     function setDepositLimits(
         uint256 minDeposit,
-        uint256 maxDeposit
+        uint256 maxDepositLimit
     ) external onlyRole(STRATEGY_MANAGER_ROLE) {
-        require(minDeposit <= maxDeposit, "Invalid deposit limits");
+        require(minDeposit <= maxDepositLimit, "Invalid deposit limits");
         config.minDeposit = minDeposit;
-        config.maxDeposit = maxDeposit;
+        config.maxDeposit = maxDepositLimit;
     }
     
     function setTreasury(address _treasury) external onlyRole(DEFAULT_ADMIN_ROLE) {

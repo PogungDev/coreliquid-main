@@ -99,8 +99,9 @@ contract APRCalculator is Ownable {
     constructor(
         address _liquidityPool,
         address _rebalancer,
-        address _compoundEngine
-    ) {
+        address _compoundEngine,
+        address initialOwner
+    ) Ownable(initialOwner) {
         liquidityPool = UnifiedLiquidityPool(_liquidityPool);
         rebalancer = DynamicRebalancer(_rebalancer);
         compoundEngine = CompoundEngine(_compoundEngine);
@@ -195,7 +196,7 @@ contract APRCalculator is Ownable {
     /**
      * @dev Get historical performance data
      */
-    function getHistoricalPerformance(uint256 days) external view returns (
+    function getHistoricalPerformance(uint256 daysCount) external view returns (
         uint256[] memory timestamps,
         uint256[] memory aprValues,
         uint256[] memory volatilityValues,
@@ -203,9 +204,9 @@ contract APRCalculator is Ownable {
         uint256 maxAPR,
         uint256 minAPR
     ) {
-        require(days <= 30, "Maximum 30 days of history");
+        require(daysCount <= 30, "Maximum 30 days of history");
         
-        uint256 dataPoints = Math.min(days * 24, historicalData.length);
+        uint256 dataPoints = Math.min(daysCount * 24, historicalData.length);
         timestamps = new uint256[](dataPoints);
         aprValues = new uint256[](dataPoints);
         volatilityValues = new uint256[](dataPoints);
@@ -441,11 +442,11 @@ contract APRCalculator is Ownable {
     }
 
     // Helper functions
-    function _getTotalPoolValue() internal view returns (uint256) {
+    function _getTotalPoolValue() internal pure returns (uint256) {
         return 1000000e18; // Mock value for demo
     }
 
-    function _calculateCurrentYield() internal view returns (uint256) {
+    function _calculateCurrentYield() internal pure returns (uint256) {
         return 2740e18; // Mock daily yield for demo
     }
 
@@ -518,7 +519,7 @@ contract APRCalculator is Ownable {
         return (positiveReturns * BASIS_POINTS) / (historicalData.length - 1);
     }
 
-    function _calculateLiquidityRisk() internal view returns (uint256) {
+    function _calculateLiquidityRisk() internal pure returns (uint256) {
         uint256 totalValue = _getTotalPoolValue();
         
         // Simple liquidity risk assessment based on pool size

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
@@ -164,7 +164,24 @@ contract LiquidationEngine is AccessControl, ReentrancyGuard, Pausable {
         require(isLiquidatable, "Position not liquidatable");
         
         // Get position details
-        BorrowEngine.BorrowPosition memory position = borrowEngine.borrowPositions(positionId);
+        (uint256 posId, address borrower, address borrowToken, address collateralToken, uint256 borrowAmount, uint256 collateralAmount, uint256 borrowTimestamp, uint256 lastInterestUpdate, uint256 accruedInterest, uint256 positionLiquidationThreshold, uint256 ltv, bool isActive, bool isLiquidated) = borrowEngine.borrowPositions(positionId);
+        
+        // Create a temporary struct for easier access
+        BorrowEngine.BorrowPosition memory position = BorrowEngine.BorrowPosition({
+            positionId: posId,
+            borrower: borrower,
+            borrowToken: borrowToken,
+            collateralToken: collateralToken,
+            borrowAmount: borrowAmount,
+            collateralAmount: collateralAmount,
+            borrowTimestamp: borrowTimestamp,
+            lastInterestUpdate: lastInterestUpdate,
+            accruedInterest: accruedInterest,
+            liquidationThreshold: liquidationThreshold,
+            ltv: ltv,
+            isActive: isActive,
+            isLiquidated: isLiquidated
+        });
         require(position.isActive, "Position not active");
         
         LiquidationConfig memory config = liquidationConfigs[position.borrowToken];
@@ -427,7 +444,24 @@ contract LiquidationEngine is AccessControl, ReentrancyGuard, Pausable {
     
     function _executeEmergencyLiquidation(uint256 positionId) internal {
         // Emergency liquidation at current market price
-        BorrowEngine.BorrowPosition memory position = borrowEngine.borrowPositions(positionId);
+        (uint256 posId, address borrower, address borrowToken, address collateralToken, uint256 borrowAmount, uint256 collateralAmount, uint256 borrowTimestamp, uint256 lastInterestUpdate, uint256 accruedInterest, uint256 liquidationThreshold, uint256 ltv, bool isActive, bool isLiquidated) = borrowEngine.borrowPositions(positionId);
+        
+        // Create a temporary struct for easier access
+        BorrowEngine.BorrowPosition memory position = BorrowEngine.BorrowPosition({
+            positionId: posId,
+            borrower: borrower,
+            borrowToken: borrowToken,
+            collateralToken: collateralToken,
+            borrowAmount: borrowAmount,
+            collateralAmount: collateralAmount,
+            borrowTimestamp: borrowTimestamp,
+            lastInterestUpdate: lastInterestUpdate,
+            accruedInterest: accruedInterest,
+            liquidationThreshold: liquidationThreshold,
+            ltv: ltv,
+            isActive: isActive,
+            isLiquidated: isLiquidated
+        });
         
         uint256 totalDebt = position.borrowAmount + position.accruedInterest;
         

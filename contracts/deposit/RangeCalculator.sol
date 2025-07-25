@@ -38,7 +38,7 @@ contract RangeCalculator is Ownable {
         uint256 volatility
     );
     
-    constructor() {
+    constructor(address initialOwner) Ownable(initialOwner) {
         // Initialize common tick spacings
         validTickSpacings[1] = true;   // 0.01% fee
         validTickSpacings[10] = true;  // 0.05% fee
@@ -66,7 +66,7 @@ contract RangeCalculator is Ownable {
         uint256 currentPrice,
         address pool,
         int24 tickSpacing
-    ) external view returns (int24 tickLower, int24 tickUpper) {
+    ) external returns (int24 tickLower, int24 tickUpper) {
         require(validTickSpacings[tickSpacing], "Invalid tick spacing");
         
         // Use proper Uniswap V3 tick calculation: tick = log_1.0001(price)

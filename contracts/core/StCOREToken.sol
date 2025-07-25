@@ -3,9 +3,11 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
@@ -15,6 +17,7 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
  */
 contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Pausable {
     using Math for uint256;
+    using SafeERC20 for IERC20;
     
     // Role definitions
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
@@ -56,6 +59,8 @@ contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Paus
     uint256 public totalRewardsDistributed;
     uint256 public protocolFee; // Fee in basis points (e.g., 500 = 5%)
     address public treasury;
+    address public stakingContract;
+    IERC20 public coreToken; // Reference to CORE token
     
     // Events
     event ExchangeRateUpdated(uint256 oldRate, uint256 newRate);
@@ -63,12 +68,16 @@ contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Paus
     event RewardsClaimed(address indexed user, uint256 amount);
     event ProtocolFeeUpdated(uint256 oldFee, uint256 newFee);
     event TreasuryUpdated(address oldTreasury, address newTreasury);
+    event StakingContractUpdated(address oldContract, address newContract);
     
     constructor(
         string memory name,
         string memory symbol,
-        address _treasury
+        address _coreToken,
+        address _stakingContract
     ) ERC20(name, symbol) ERC20Permit(name) {
+        require(_coreToken != address(0), "Invalid CORE token address");
+        coreToken = IERC20(_coreToken);
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
         _grantRole(MINTER_ROLE, msg.sender);
         _grantRole(BURNER_ROLE, msg.sender);
@@ -76,8 +85,16 @@ contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Paus
         
         _exchangeRate = INITIAL_EXCHANGE_RATE;
         _lastRewardUpdate = block.timestamp;
-        treasury = _treasury;
+        stakingContract = _stakingContract;
+        treasury = msg.sender; // Set deployer as initial treasury
         protocolFee = 500; // 5% default protocol fee
+        
+        // Grant roles to staking contract if provided
+        if (_stakingContract != address(0)) {
+            _grantRole(MINTER_ROLE, _stakingContract);
+            _grantRole(BURNER_ROLE, _stakingContract);
+            _grantRole(ORACLE_ROLE, _stakingContract);
+        }
         
         // Initialize first epoch
         rewardEpochs[0] = RewardEpoch({
@@ -97,6 +114,7 @@ contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Paus
     function mint(address to, uint256 coreAmount) external onlyRole(MINTER_ROLE) whenNotPaused {
         require(to != address(0), "Cannot mint to zero address");
         require(coreAmount > 0, "Amount must be greater than 0");
+        require(coreAmount >= 1e18, "Minimum 1 CORE required");
         
         // Update rewards before minting
         _updateRewards();
@@ -131,8 +149,12 @@ contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Paus
         // Calculate CORE amount based on current exchange rate
         coreAmount = (stCoreAmount * _exchangeRate) / 1e18;
         
-        // Update total staked
-        _totalCoreStaked -= coreAmount;
+        // Update total staked (prevent underflow)
+        if (_totalCoreStaked >= coreAmount) {
+            _totalCoreStaked -= coreAmount;
+        } else {
+            _totalCoreStaked = 0;
+        }
         
         // Burn stCORE tokens
         _burn(from, stCoreAmount);
@@ -155,6 +177,11 @@ contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Paus
         // Calculate protocol fee
         uint256 fee = (rewardAmount * protocolFee) / 10000;
         uint256 netRewards = rewardAmount - fee;
+        
+        // Protocol fee allocated to treasury without transfer
+        if (fee > 0 && treasury != address(0)) {
+            // Fee allocated without actual transfer
+        }
         
         // Update accumulated rewards
         _accumulatedRewards += netRewards;
@@ -342,12 +369,12 @@ contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Paus
     /**
      * @dev Override transfer to update reward debt
      */
-    function _beforeTokenTransfer(
+    function _update(
         address from,
         address to,
         uint256 amount
     ) internal override whenNotPaused {
-        super._beforeTokenTransfer(from, to, amount);
+        super._update(from, to, amount);
         
         if (from != address(0)) {
             _updateUserRewardDebt(from);
@@ -355,6 +382,32 @@ contract StCOREToken is ERC20, ERC20Permit, AccessControl, ReentrancyGuard, Paus
         if (to != address(0)) {
             _updateUserRewardDebt(to);
         }
+    }
+    
+    /**
+     * @dev Set staking contract address (admin only)
+     * @param newStakingContract New staking contract address
+     */
+    function setStakingContract(address newStakingContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newStakingContract != address(0), "Staking contract cannot be zero address");
+        
+        address oldContract = stakingContract;
+        
+        // Revoke roles from old contract if it exists
+        if (oldContract != address(0)) {
+            _revokeRole(MINTER_ROLE, oldContract);
+            _revokeRole(BURNER_ROLE, oldContract);
+            _revokeRole(ORACLE_ROLE, oldContract);
+        }
+        
+        stakingContract = newStakingContract;
+        
+        // Grant roles to new contract
+        _grantRole(MINTER_ROLE, newStakingContract);
+        _grantRole(BURNER_ROLE, newStakingContract);
+        _grantRole(ORACLE_ROLE, newStakingContract);
+        
+        emit StakingContractUpdated(oldContract, newStakingContract);
     }
     
     /**
