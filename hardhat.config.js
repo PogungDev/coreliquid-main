@@ -18,14 +18,28 @@ const CORE_TESTNET_RPC_URL = process.env.CORE_TESTNET_RPC_URL || "https://rpc.te
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
   solidity: {
-    version: "0.8.19",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    compilers: [
+      {
+        version: "0.8.20",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true,
+        },
       },
-      viaIR: true,
-    },
+      {
+        version: "0.8.24",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true,
+        },
+      },
+    ],
   },
   
   networks: {
@@ -90,7 +104,7 @@ module.exports = {
     coreTestnet: {
       url: CORE_TESTNET_RPC_URL,
       accounts: [PRIVATE_KEY],
-      chainId: 1115,
+      chainId: 1114,
       gas: "auto",
       gasPrice: "auto",
       timeout: 300000,
@@ -239,6 +253,8 @@ module.exports = {
     artifacts: "./artifacts",
     deployments: "./deployments",
   },
+
+
   
   // Custom tasks
   tasks: {
